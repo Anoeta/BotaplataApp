@@ -6,8 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+
+/* Begin PBXContainerItemProxy section */
+		AA00000B000000000000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 480B714B3003DF62009FDFB2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 480B71523003DF62009FDFB2;
+			remoteInfo = BotaplataApp;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		480B71533003DF62009FDFB2 /* BotaplataApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BotaplataApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000010000000000000001 /* BotaplataAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BotaplataAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,9 +28,21 @@
 			path = BotaplataApp;
 			sourceTree = "<group>";
 		};
+		AA0000020000000000000002 /* BotaplataAppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BotaplataAppTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AA0000050000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		480B71503003DF62009FDFB2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -33,6 +57,7 @@
 			isa = PBXGroup;
 			children = (
 				480B71553003DF62009FDFB2 /* BotaplataApp */,
+				AA0000020000000000000002 /* BotaplataAppTests */,
 				480B71543003DF62009FDFB2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +66,7 @@
 			isa = PBXGroup;
 			children = (
 				480B71533003DF62009FDFB2 /* BotaplataApp.app */,
+				AA0000010000000000000001 /* BotaplataAppTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +74,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AA0000030000000000000003 /* BotaplataAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000070000000000000007 /* Build configuration list for PBXNativeTarget "BotaplataAppTests" */;
+			buildPhases = (
+				AA0000040000000000000004 /* Sources */,
+				AA0000050000000000000005 /* Frameworks */,
+				AA0000060000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA00000A000000000000000A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000020000000000000002 /* BotaplataAppTests */,
+			);
+			name = BotaplataAppTests;
+			packageProductDependencies = (
+			);
+			productName = BotaplataAppTests;
+			productReference = AA0000010000000000000001 /* BotaplataAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		480B71523003DF62009FDFB2 /* BotaplataApp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 480B715E3003DF65009FDFB2 /* Build configuration list for PBXNativeTarget "BotaplataApp" */;
@@ -80,6 +129,10 @@
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
+					AA0000030000000000000003 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = 480B71523003DF62009FDFB2;
+					};
 					480B71523003DF62009FDFB2 = {
 						CreatedOnToolsVersion = 26.5;
 					};
@@ -100,11 +153,19 @@
 			projectRoot = "";
 			targets = (
 				480B71523003DF62009FDFB2 /* BotaplataApp */,
+				AA0000030000000000000003 /* BotaplataAppTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		AA0000060000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		480B71513003DF62009FDFB2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +176,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AA0000040000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		480B714F3003DF62009FDFB2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -124,7 +192,25 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		AA00000A000000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 480B71523003DF62009FDFB2 /* BotaplataApp */;
+			targetProxy = AA00000B000000000000000B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		AA0000080000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = { BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = D45ZVN76AS; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 26.5; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = fr.ios.BotaplataAppTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BotaplataApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BotaplataApp"; };
+			name = Debug;
+		};
+		AA0000090000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = { BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = D45ZVN76AS; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 26.5; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = fr.ios.BotaplataAppTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BotaplataApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BotaplataApp"; };
+			name = Release;
+		};
 		480B715C3003DF65009FDFB2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -313,6 +399,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		AA0000070000000000000007 /* Build configuration list for PBXNativeTarget "BotaplataAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000080000000000000008 /* Debug */,
+				AA0000090000000000000009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		480B714E3003DF62009FDFB2 /* Build configuration list for PBXProject "BotaplataApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
