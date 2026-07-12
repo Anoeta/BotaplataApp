@@ -1,0 +1,12 @@
+import XCTest
+@testable import BotaplataApp
+
+final class BotaplataAppTests: XCTestCase {
+    func testMoneyFormatting() { XCTAssertEqual(FinancialFormatters.money(.init(12.34)), "12,34 USDC"); XCTAssertTrue(FinancialFormatters.money(.init(-1.5)).contains("-1,50")); XCTAssertEqual(FinancialFormatters.money(.init(0)), "0,00 USDC"); XCTAssertEqual(FinancialFormatters.money(nil), "—"); XCTAssertTrue(FinancialFormatters.money(.init(1, currency: "USDC")).contains("USDC")) }
+    func testFreshnessStates() { XCTAssertEqual(FreshnessStatus.fresh.rawValue, "fresh"); XCTAssertEqual(FreshnessStatus.aging.rawValue, "aging"); XCTAssertEqual(FreshnessStatus.stale.rawValue, "stale"); XCTAssertEqual(FreshnessStatus.cached.rawValue, "cached") }
+    func testProviders() { XCTAssertEqual(TradingProvider.kraken.displayName, "Kraken"); XCTAssertEqual(TradingProvider.binanceLegacy.displayName, "Historique Binance"); XCTAssertEqual(TradingProvider.unknown.displayName, "Provider inconnu") }
+    func testSessionStates() { XCTAssertEqual(SessionLifecycleState.waitingBuy.userMessage, "Botaplata cherche une opportunité d'achat."); XCTAssertEqual(SessionLifecycleState.waitingBuyFill.userMessage, "L'ordre d'achat est en attente sur Kraken."); XCTAssertEqual(SessionLifecycleState.positionOpen.label, "Position ouverte"); XCTAssertEqual(SessionLifecycleState.waitingSell.label, "Attente SELL"); XCTAssertEqual(SessionLifecycleState.stopped.label, "Arrêtée") }
+    func testOrderStatusesAreDistinct() { XCTAssertNotEqual(OrderStatus.submitted, .filled); XCTAssertNotEqual(OrderStatus.open, .filled); XCTAssertNotEqual(OrderStatus.reconciliationRequired, .rejected) }
+    func testFeeAwareKeepsMissingValuesNil() { let full = PreviewFixtures.feeComplete; XCTAssertNotNil(full.breakEvenPrice); let partial = PreviewFixtures.feePartial; XCTAssertNil(partial.breakEvenPrice); XCTAssertNil(partial.buyFeeQuote?.value); XCTAssertEqual(FinancialFormatters.money(partial.buyFeeQuote), "—") }
+    @MainActor func testAppStateTransitions() { let state = AppState(); XCTAssertEqual(state.sessionState, .unknown); state.restore(); XCTAssertEqual(state.sessionState, .restoring); state.markLoggedOut(); XCTAssertEqual(state.sessionState, .loggedOut); state.markAuthenticated(); XCTAssertEqual(state.sessionState, .authenticated); state.markRevoked(); XCTAssertEqual(state.sessionState, .revoked); state.markExpired(); XCTAssertEqual(state.sessionState, .expired) }
+}

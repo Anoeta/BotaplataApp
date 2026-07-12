@@ -1,0 +1,3 @@
+import Foundation
+struct SessionSummary: Identifiable, Equatable, Sendable { let id: String; let pair: String; let provider: TradingProvider; let lifecycle: SessionLifecycleState; let runtimeHealth: RuntimeHealthState; let freshness: DataFreshness; let executionMode: ExecutionMode }
+struct SessionDetail: Identifiable, Equatable, Sendable { let id: String; let pair: String; let provider: TradingProvider; let lifecycle: SessionLifecycleState; let runtimeHealth: RuntimeHealthState; let freshness: DataFreshness; let currentPrice: MoneyAmount?; let position: OpenPosition?; let decision: StrategyDecisionSummary; let activeOrder: TradingOrderSummary?; let pnl: ProfitAndLoss?; let feeAware: FeeAwareSummary; let warnings: [Warning] }
