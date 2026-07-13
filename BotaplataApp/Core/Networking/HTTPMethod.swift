@@ -1,0 +1,3 @@
+import Foundation
+
+enum HTTPMethod: String, Sendable { case get = "GET", post = "POST", put = "PUT", delete = "DELETE" }

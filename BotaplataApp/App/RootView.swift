@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppState.self) private var appState
     @Environment(AppRouter.self) private var router
+    @Environment(AuthenticationStore.self) private var authStore
 
     var body: some View {
         @Bindable var router = router
@@ -17,9 +18,19 @@ struct RootView: View {
                 }
                 .tint(BotaplataColors.accent)
             case .restoring:
-                LoadingStateView(title: "Restauration", message: "Préparation du dernier état connu.")
-            case .loggedOut, .unknown, .authenticating, .awaitingTwoFactor, .lockedLocally, .revoked, .expired:
-                AuthenticationPlaceholderView(state: appState.sessionState)
+                AuthenticationRestoringView()
+            case .unknown:
+                AuthenticationRestoringView()
+            case .loggedOut, .authenticating:
+                if authStore.didCompleteOnboarding { LoginView() } else { OnboardingView { authStore.didCompleteOnboarding = true } }
+            case .awaitingTwoFactor:
+                TwoFactorView()
+            case .lockedLocally:
+                BiometricLockView(authenticator: LocalAuthenticationBiometricAuthenticator())
+            case .revoked:
+                DeviceRevokedView()
+            case .expired:
+                SessionExpiredView()
             }
         }
     }
