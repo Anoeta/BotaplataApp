@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 @testable import BotaplataApp
 
@@ -304,15 +305,58 @@ private actor ControlledAuthenticationRepository: AuthenticationRepository {
 }
 
 private actor ControlledAppClock: AppClock {
-    private var continuations: [CheckedContinuation<Void, Error>] = []
+    private var continuations: [CancellationContinuationBox] = []
     private var sleepWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
     private(set) var requestedSeconds: [TimeInterval] = []
     var sleepCount: Int { requestedSeconds.count }
     func sleep(seconds: TimeInterval) async throws {
         requestedSeconds.append(seconds); signalSleepWaiters()
-        try await withTaskCancellationHandler(operation: { try await withCheckedThrowingContinuation { continuations.append($0) } }, onCancel: { })
+        let box = CancellationContinuationBox()
+        try await withTaskCancellationHandler(operation: {
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation { continuation in
+                box.store(continuation)
+                continuations.append(box)
+            }
+        }, onCancel: {
+            box.cancel()
+        })
     }
     func resumeAll() { continuations.forEach { $0.resume() }; continuations.removeAll() }
     func waitForSleepCount(_ count: Int) async { if requestedSeconds.count >= count { return }; await withCheckedContinuation { sleepWaiters.append((count, $0)) } }
     private func signalSleepWaiters() { let ready = sleepWaiters.filter { requestedSeconds.count >= $0.0 }; sleepWaiters.removeAll { requestedSeconds.count >= $0.0 }; ready.forEach { $0.1.resume() } }
+}
+
+private final class CancellationContinuationBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var cancelled = false
+
+    func store(_ continuation: CheckedContinuation<Void, Error>) {
+        lock.lock()
+        if cancelled {
+            lock.unlock()
+            continuation.resume(throwing: CancellationError())
+        } else {
+            self.continuation = continuation
+            lock.unlock()
+        }
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        let continuation = continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume(throwing: CancellationError())
+    }
+
+    func resume() {
+        lock.lock()
+        let continuation = continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume()
+    }
 }
