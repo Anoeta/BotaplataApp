@@ -17,13 +17,11 @@ actor MockAuthenticationRepository: AuthenticationRepository {
         guard code == "123456" else { throw AuthenticationError.invalidTwoFactorCode }
         let s = AuthenticationFixtures.successfulSession; session = s; return s
     }
-    func refresh(refreshToken: String) async throws -> AuthenticatedSession {
+    func refresh(refreshToken: String, installationID: String) async throws -> AuthenticatedSession {
         refreshCallCount += 1
         switch scenario { case .refreshRevoked: throw AuthenticationError.refreshRevoked; case .deviceRevoked: throw AuthenticationError.deviceRevoked; case .offline: throw AuthenticationError.offline; default: let s = AuthenticationFixtures.successfulSession; session = s; return s }
     }
-    func logout(refreshToken: String?) async { session = nil }
-    func restoreSession(refreshToken: String) async throws -> AuthenticatedSession { try await refresh(refreshToken: refreshToken) }
-    func currentUser() async throws -> AuthenticatedUser? { session?.user }
-    func currentDevice() async throws -> AuthorizedDevice? { session?.device }
-    func revokeCurrentDevice() async throws { session = nil; scenario = .deviceRevoked; throw AuthenticationError.deviceRevoked }
+    func logout(accessToken: String?) async { session = nil }
+    func authorizedDevices(accessToken: String) async throws -> [AuthorizedDevice] { [AuthenticationFixtures.device] }
+    func revokeDevice(id: String, accessToken: String) async throws -> DeviceRevocationResult { session = nil; return DeviceRevocationResult(revokedDeviceID: id, currentDeviceRevoked: id == AuthenticationFixtures.device.id) }
 }

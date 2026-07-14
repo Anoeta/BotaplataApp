@@ -1,7 +1,7 @@
 import Foundation
 
 enum SecureLogging {
-    private static let sensitiveKeys = ["Authorization", "access_token", "refresh_token", "password", "totp", "code", "secret"]
+    private static let sensitiveKeys = ["Authorization", "access_token", "refresh_token", "password", "totp", "code", "secret", "installation_id"]
     static func sanitized(_ value: String) -> String {
         var output = value
         for key in sensitiveKeys {

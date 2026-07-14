@@ -8,16 +8,18 @@ actor AuthenticationSession {
     init(repository: AuthenticationRepository, tokenStore: TokenStoreProtocol) { self.repository = repository; self.tokenStore = tokenStore }
     var accessToken: String? { session?.accessToken }
     var user: AuthenticatedUser? { session?.user }
-    var device: AuthorizedDevice? { session?.device }
-    func apply(_ newSession: AuthenticatedSession) async throws { session = newSession; try await tokenStore.saveRefreshToken(newSession.refreshToken); try await tokenStore.saveDeviceID(newSession.device.id) }
-    func restore() async throws -> AuthenticatedSession? { guard let token = try await tokenStore.readRefreshToken() else { return nil }; let restored = try await repository.restoreSession(refreshToken: token); try await apply(restored); return restored }
+    var deviceID: String? { session?.deviceID }
+    func apply(_ newSession: AuthenticatedSession) async throws { session = newSession; try await tokenStore.saveRefreshToken(newSession.refreshToken); try await tokenStore.saveDeviceID(newSession.deviceID) }
+    func restore() async throws -> AuthenticatedSession? { guard try await tokenStore.readRefreshToken() != nil else { return nil }; return try await refresh() }
     func refresh() async throws -> AuthenticatedSession {
         if let refreshTask { return try await refreshTask.value }
-        let task = Task<AuthenticatedSession, Error> { [repository, tokenStore] in guard let token = try await tokenStore.readRefreshToken() else { throw AuthenticationError.refreshRevoked }; return try await repository.refresh(refreshToken: token) }
+        let task = Task<AuthenticatedSession, Error> { [repository, tokenStore] in guard let token = try await tokenStore.readRefreshToken() else { throw AuthenticationError.refreshRevoked }; let installationID = try await tokenStore.installationID(); return try await repository.refresh(refreshToken: token, installationID: installationID) }
         refreshTask = task
         do { let refreshed = try await task.value; try await apply(refreshed); refreshTask = nil; return refreshed } catch { refreshTask = nil; if matchesPurge(error) { try? await purgeLocal() }; throw error }
     }
-    func logout() async { let token = try? await tokenStore.readRefreshToken(); await repository.logout(refreshToken: token ?? nil); try? await purgeLocal() }
+    func logout() async { await repository.logout(accessToken: session?.accessToken); try? await purgeLocal() }
+    func authorizedDevices() async throws -> [AuthorizedDevice] { guard let token = session?.accessToken else { throw AuthenticationError.accessTokenExpired }; return try await repository.authorizedDevices(accessToken: token) }
+    func revokeDevice(id: String) async throws -> DeviceRevocationResult { guard let token = session?.accessToken else { throw AuthenticationError.accessTokenExpired }; let result = try await repository.revokeDevice(id: id, accessToken: token); if result.currentDeviceRevoked { try await purgeLocal() }; return result }
     func purgeLocal() async throws { session = nil; try await tokenStore.purgeSession() }
-    private func matchesPurge(_ error: Error) -> Bool { (error as? AuthenticationError) == .refreshRevoked || (error as? AuthenticationError) == .deviceRevoked }
+    private func matchesPurge(_ error: Error) -> Bool { [AuthenticationError.refreshRevoked, .refreshReuseDetected, .deviceRevoked, .accessTokenExpired].contains(error as? AuthenticationError) }
 }
