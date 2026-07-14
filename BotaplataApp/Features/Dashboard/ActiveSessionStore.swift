@@ -30,7 +30,9 @@ final class ActiveSessionStore {
                     let refreshed = try await authSession.refresh()
                     snapshot = try await repository.fetchActiveSnapshot(accessToken: refreshed.accessToken)
                 }
+                try Task.checkCancellation()
                 let accepted = await MainActor.run { self.apply(snapshot, generation: generation) }
+                try Task.checkCancellation()
                 if accepted { await cache.save(snapshot) }
             } catch is CancellationError { return }
             catch AuthenticationError.accessTokenExpired { await MainActor.run { self.appState.transition(to: .expired) } }
