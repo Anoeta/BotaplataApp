@@ -12,7 +12,7 @@ final class AuthenticationStore {
     var didCompleteOnboarding = false
     private let repository: AuthenticationRepository
     private let tokenStore: TokenStoreProtocol
-    private let session: AuthenticationSession
+    let session: AuthenticationSession
     private let appState: AppState
     init(repository: AuthenticationRepository, tokenStore: TokenStoreProtocol, appState: AppState) {
         self.repository = repository; self.tokenStore = tokenStore; self.appState = appState; self.session = AuthenticationSession(repository: repository, tokenStore: tokenStore)
