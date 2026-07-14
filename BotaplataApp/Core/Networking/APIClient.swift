@@ -17,6 +17,12 @@ struct APIClient: APIClientProtocol {
     init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 20) { self.baseURL = baseURL; self.session = session; self.timeout = timeout }
 
     func send<Response: Decodable & Sendable, Body: Encodable & Sendable>(_ endpoint: APIEndpoint, body: Body? = Optional<EmptyBody>.none) async throws -> Response {
+        let envelope: APIEnvelope<Response> = try await sendEnvelope(endpoint, body: body)
+        guard let payload = envelope.data else { throw APIClientError.decoding }
+        return payload
+    }
+
+    func sendEnvelope<Response: Decodable & Sendable, Body: Encodable & Sendable>(_ endpoint: APIEndpoint, body: Body? = Optional<EmptyBody>.none) async throws -> APIEnvelope<Response> {
         var components = URLComponents(url: baseURL.appendingPathComponent(endpoint.path), resolvingAgainstBaseURL: false)
         if !endpoint.queryItems.isEmpty { components?.queryItems = endpoint.queryItems }
         guard let url = components?.url else { throw APIClientError.invalidURL }
@@ -32,7 +38,7 @@ struct APIClient: APIClientProtocol {
             guard let http = response as? HTTPURLResponse else { throw APIClientError.network }
             let envelope = try JSONCoding.decoder.decode(APIEnvelope<Response>.self, from: data)
             guard envelope.version == "mobile_v1" else { throw APIClientError.invalidVersion(envelope.version) }
-            if envelope.ok, (200..<300).contains(http.statusCode), let payload = envelope.data { return payload }
+            if envelope.ok, (200..<300).contains(http.statusCode) { return envelope }
             let mapped = AuthenticationError(code: envelope.error?.code)
             if !(200..<300).contains(http.statusCode) { throw APIClientError.httpStatus(http.statusCode, requestID: envelope.meta.requestID) }
             throw APIClientError.business(mapped, requestID: envelope.meta.requestID)

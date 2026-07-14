@@ -7,6 +7,10 @@ actor AuthenticationSession {
     private var refreshTask: Task<AuthenticatedSession, Error>?
     init(repository: AuthenticationRepository, tokenStore: TokenStoreProtocol) { self.repository = repository; self.tokenStore = tokenStore }
     var accessToken: String? { session?.accessToken }
+    func validAccessTokenRefreshingIfNeeded() async throws -> String {
+        if let token = session?.accessToken { return token }
+        return try await refresh().accessToken
+    }
     var user: AuthenticatedUser? { session?.user }
     var deviceID: String? { session?.deviceID }
     func apply(_ newSession: AuthenticatedSession) async throws { session = newSession; try await tokenStore.saveRefreshToken(newSession.refreshToken); try await tokenStore.saveDeviceID(newSession.deviceID) }
