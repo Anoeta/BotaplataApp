@@ -18,10 +18,10 @@ final class AuthenticationFoundationTests: XCTestCase {
         await repo.setScenario(.tooManyAttempts)
         await XCTAssertThrowsAuthentication(.tooManyAttempts) { _ = try await repo.verifyTwoFactor(challengeID: "fixture", code: "123456") }
         await repo.setScenario(.refreshRevoked)
-        await XCTAssertThrowsAuthentication(.refreshRevoked) { _ = try await repo.refresh(refreshToken: "fixture-refresh-token-never-production") }
+        await XCTAssertThrowsAuthentication(.refreshRevoked) { _ = try await repo.refresh(refreshToken: "fixture-refresh-token-never-production", installationID: "stable-installation") }
         await repo.setScenario(.deviceRevoked)
-        await XCTAssertThrowsAuthentication(.deviceRevoked) { _ = try await repo.refresh(refreshToken: "fixture-refresh-token-never-production") }
-        await repo.logout(refreshToken: nil)
+        await XCTAssertThrowsAuthentication(.deviceRevoked) { _ = try await repo.refresh(refreshToken: "fixture-refresh-token-never-production", installationID: "stable-installation") }
+        await repo.logout(accessToken: nil)
     }
 
     func testInvalidTwoFactorCode() async {

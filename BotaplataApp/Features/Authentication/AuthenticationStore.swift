@@ -21,7 +21,10 @@ final class AuthenticationStore {
         appState.transition(to: .restoring)
         do { _ = try await tokenStore.installationID(); if try await session.restore() != nil { appState.transition(to: .authenticated) } else { appState.transition(to: .loggedOut) } }
         catch AuthenticationError.deviceRevoked { try? await session.purgeLocal(); appState.transition(to: .revoked) }
-        catch AuthenticationError.offline { appState.transition(to: .offlineWithCachedSession) }
+        catch AuthenticationError.offline { appState.transition(to: .loggedOut) }
+        catch AuthenticationError.refreshRevoked { try? await session.purgeLocal(); appState.transition(to: .expired) }
+        catch AuthenticationError.refreshReuseDetected { try? await session.purgeLocal(); appState.transition(to: .expired) }
+        catch AuthenticationError.accessTokenExpired { try? await session.purgeLocal(); appState.transition(to: .expired) }
         catch { appState.transition(to: .loggedOut) }
     }
     func login(username: String, password: String) async {
@@ -33,7 +36,7 @@ final class AuthenticationStore {
     func verify(code: String) async {
         guard let challenge else { return }
         twoFactorPhase = .validating
-        do { let s = try await repository.verifyTwoFactor(challengeID: challenge.id, code: code); try await session.apply(s); twoFactorPhase = .entry; appState.transition(to: .authenticated) }
+        do { let s = try await repository.verifyTwoFactor(challengeID: challenge.id, code: code); try await session.apply(s); self.challenge = nil; twoFactorPhase = .entry; appState.transition(to: .authenticated) }
         catch { let auth = (error as? AuthenticationError) ?? .unknown; twoFactorPhase = .error(auth.userMessage); if auth == .deviceRevoked { appState.transition(to: .revoked) } else if auth == .challengeExpired { appState.transition(to: .expired) } }
     }
     func logout() async { await session.logout(); challenge = nil; appState.transition(to: .loggedOut) }
