@@ -6,6 +6,7 @@ struct BotaplataApp: App {
     @State private var router = AppRouter()
     @State private var authStore: AuthenticationStore
     @State private var activeSessionStore: ActiveSessionStore
+    @State private var realSessionsStore: RealSessionsStore
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -22,9 +23,11 @@ struct BotaplataApp: App {
         let tokenStore: TokenStoreProtocol = KeychainTokenStore()
         let auth = AuthenticationStore(repository: repository, tokenStore: tokenStore, appState: state)
         let snapshotRepository: RealActiveSnapshotRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockRealActiveSnapshotRepository() : BotaplataApp.makeSnapshotRepository(environment: environment)
+        let sessionsRepository: RealSessionsRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockRealSessionsRepository() : BotaplataApp.makeSessionsRepository(environment: environment)
         _appState = State(initialValue: state)
         _authStore = State(initialValue: auth)
         _activeSessionStore = State(initialValue: ActiveSessionStore(repository: snapshotRepository, cache: FileActiveSessionCache(), authSession: auth.session, appState: state))
+        _realSessionsStore = State(initialValue: RealSessionsStore(repository: sessionsRepository, cache: FileRealSessionsCache(), authSession: auth.session, appState: state))
     }
 
     static func makeRepository(environment: AppEnvironment) -> AuthenticationRepository {
@@ -37,7 +40,12 @@ struct BotaplataApp: App {
         return RemoteRealActiveSnapshotRepository(client: APIClient(baseURL: baseURL))
     }
 
+    static func makeSessionsRepository(environment: AppEnvironment) -> RealSessionsRepository {
+        guard let baseURL = environment.baseURL else { return UnconfiguredRealSessionsRepository() }
+        return RemoteRealSessionsRepository(client: APIClient(baseURL: baseURL))
+    }
+
     var body: some Scene {
-        WindowGroup { RootView().environment(appState).environment(router).environment(authStore).environment(activeSessionStore).task { if appState.sessionState == .unknown { await authStore.restore() } } }
+        WindowGroup { RootView().environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).task { if appState.sessionState == .unknown { await authStore.restore() } } }
     }
 }
