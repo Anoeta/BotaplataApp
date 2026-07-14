@@ -10,7 +10,7 @@ struct AppEnvironment: Equatable, Sendable {
     let isProductionData: Bool
     let baseURL: URL?
 
-    static let development = AppEnvironment(name: "Development", kind: .development, dataSource: .unknown, fixtureSource: nil, isProductionData: false, baseURL: URL(string: "http://192.168.1.47:31119"))
+    static let development = AppEnvironment(name: "Development", kind: .development, dataSource: .unknown, fixtureSource: nil, isProductionData: false, baseURL: Bundle.main.botaplataBaseURL)
     static let testFlight = AppEnvironment(name: "TestFlight", kind: .testFlight, dataSource: .unknown, fixtureSource: nil, isProductionData: true, baseURL: Bundle.main.botaplataBaseURL)
     static let production = AppEnvironment(name: "Production", kind: .production, dataSource: .unknown, fixtureSource: nil, isProductionData: true, baseURL: Bundle.main.botaplataBaseURL)
     static let normal = AppEnvironment.production
