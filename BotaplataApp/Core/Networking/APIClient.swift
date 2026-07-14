@@ -7,7 +7,7 @@ struct EmptyBody: Encodable, Sendable {}
 struct EmptyResponse: Codable, Sendable {}
 
 enum APIClientError: Error, Sendable {
-    case invalidURL, invalidVersion(String), httpStatus(Int, requestID: String?), business(AuthenticationError, requestID: String?), decoding, network, cancelled
+    case invalidURL, invalidVersion(String), httpStatus(Int, requestID: String?), backend(statusCode: Int, error: APIErrorPayload, requestID: String?), business(AuthenticationError, requestID: String?), decoding, network, cancelled, timeout
 }
 
 struct APIClient: APIClientProtocol {
@@ -40,11 +40,15 @@ struct APIClient: APIClientProtocol {
             guard envelope.version == "mobile_v1" else { throw APIClientError.invalidVersion(envelope.version) }
             if envelope.ok, (200..<300).contains(http.statusCode) { return envelope }
             let mapped = AuthenticationError(code: envelope.error?.code)
-            if !(200..<300).contains(http.statusCode) { throw APIClientError.httpStatus(http.statusCode, requestID: envelope.meta.requestID) }
+            if !(200..<300).contains(http.statusCode) {
+                if let payload = envelope.error { throw APIClientError.backend(statusCode: http.statusCode, error: payload, requestID: envelope.meta.requestID) }
+                throw APIClientError.httpStatus(http.statusCode, requestID: envelope.meta.requestID)
+            }
             throw APIClientError.business(mapped, requestID: envelope.meta.requestID)
         } catch is CancellationError { throw APIClientError.cancelled }
         catch let error as APIClientError { throw error }
         catch is DecodingError { throw APIClientError.decoding }
+        catch let error as URLError where error.code == .timedOut { throw APIClientError.timeout }
         catch { throw APIClientError.network }
     }
 }

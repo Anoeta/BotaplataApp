@@ -34,5 +34,8 @@ struct RootView: View {
                 SessionExpiredView()
             }
         }
+        .onChange(of: appState.sessionState) { _, newState in
+            if newState == .loggedOut { Task { await activeSessionStore.purge() } }
+        }
     }
 }

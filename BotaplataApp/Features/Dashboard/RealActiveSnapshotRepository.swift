@@ -10,12 +10,18 @@ struct RemoteRealActiveSnapshotRepository: RealActiveSnapshotRepository {
             guard let dto = envelope.data else { throw AuthenticationError.serverUnavailable }
             return dto.mapped(warnings: envelope.warnings, requestID: envelope.meta.requestID, serverTime: envelope.meta.serverTime)
         } catch APIClientError.business(let error, _) { throw error }
+        catch APIClientError.backend(_, let payload, _) { throw AuthenticationError(code: payload.code) }
         catch APIClientError.httpStatus(401, _) { throw AuthenticationError.accessTokenExpired }
         catch APIClientError.network { throw AuthenticationError.offline }
+        catch APIClientError.timeout { throw AuthenticationError.serverUnavailable }
         catch APIClientError.cancelled { throw CancellationError() }
         catch let error as AuthenticationError { throw error }
         catch { throw AuthenticationError.serverUnavailable }
     }
+}
+
+struct UnconfiguredRealActiveSnapshotRepository: RealActiveSnapshotRepository {
+    func fetchActiveSnapshot(accessToken: String) async throws -> RealActiveSnapshot { throw AuthenticationError.notConfigured }
 }
 
 struct MockRealActiveSnapshotRepository: RealActiveSnapshotRepository {

@@ -33,7 +33,7 @@ struct BotaplataApp: App {
     }
 
     static func makeSnapshotRepository(environment: AppEnvironment) -> RealActiveSnapshotRepository {
-        guard let baseURL = environment.baseURL else { return MockRealActiveSnapshotRepository(snapshot: RealActiveSnapshot(generatedAt: nil, activeSessionCount: 0, activeSession: nil, warnings: [], requestID: nil, serverTime: nil)) }
+        guard let baseURL = environment.baseURL else { return UnconfiguredRealActiveSnapshotRepository() }
         return RemoteRealActiveSnapshotRepository(client: APIClient(baseURL: baseURL))
     }
 
