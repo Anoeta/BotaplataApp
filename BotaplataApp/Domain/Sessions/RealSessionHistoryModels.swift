@@ -1,0 +1,20 @@
+import Foundation
+
+enum TimelineEventType: String, CaseIterable, Codable, Sendable { case sessionStarted = "session_started", cycleAnalyzed = "cycle_analyzed", decisionRecorded = "decision_recorded", buySubmitted = "buy_submitted", buyPartiallyFilled = "buy_partially_filled", buyFilled = "buy_filled", positionOpened = "position_opened", sellSubmitted = "sell_submitted", sellPartiallyFilled = "sell_partially_filled", sellFilled = "sell_filled", positionClosed = "position_closed", reconciliationPending = "reconciliation_pending", reconciliationCompleted = "reconciliation_completed", monitoringDegraded = "monitoring_degraded", sessionStopped = "session_stopped", error, unknown }
+enum TimelineSeverity: String, CaseIterable, Codable, Sendable { case info, success, warning, danger, neutral }
+struct TimelineMoney: Equatable, Sendable, Codable { let amountQuote: MoneyAmount? }
+struct TimelineEvent: Identifiable, Equatable, Sendable, Codable { let id: String; let occurredAt: Date; let type: TimelineEventType; let severity: TimelineSeverity; let title: String; let message: String; let relatedOrderID: String?; let relatedPositionID: String?; let money: TimelineMoney? }
+struct TimelinePage: Equatable, Sendable, Codable { let items: [TimelineEvent]; let pagination: RealSessionsPagination; let warnings: [Warning]; let serverTime: Date? }
+
+enum HistoryOrderSide: String, Codable, Sendable { case buy, sell, unknown; var label: String { self == .buy ? "ACHAT" : self == .sell ? "VENTE" : "ORDRE" } }
+struct SessionOrder: Identifiable, Equatable, Sendable, Codable { let id: String; let side: HistoryOrderSide; let orderType: String?; let status: OrderStatus; let statusLabel: String?; let provider: TradingProvider; let exchangeOrderID: String?; let symbol: String; let requestedQuantity: Decimal?; let executedQuantity: Decimal?; let limitPrice: MoneyAmount?; let averageFillPrice: MoneyAmount?; let requestedQuoteAmount: MoneyAmount?; let executedQuoteAmount: MoneyAmount?; let feesQuote: MoneyAmount?; let feeRateEffective: Decimal?; let liquidityRole: String?; let reconciliationState: String?; let createdAt: Date?; let updatedAt: Date?; let filledAt: Date?; let realizedPnLQuote: MoneyAmount?; let realizedPnLNetQuote: MoneyAmount? }
+struct OrdersPage: Equatable, Sendable, Codable { let items: [SessionOrder]; let pagination: RealSessionsPagination; let warnings: [Warning]; let serverTime: Date? }
+
+struct SessionDecision: Identifiable, Equatable, Sendable, Codable { let id: String; let createdAt: Date; let decision: String?; let decisionLabel: String?; let score: Decimal?; let scoreMin: Decimal?; let price: MoneyAmount?; let controller: String?; let blockers: [String]; let buyConditions: [String]; let sellConditions: [String]; let advice: [String]; let summaryTitle: String; let summaryMessage: String }
+struct DecisionsPage: Equatable, Sendable, Codable { let items: [SessionDecision]; let pagination: RealSessionsPagination; let warnings: [Warning]; let serverTime: Date? }
+
+struct ChartPoint: Identifiable, Equatable, Sendable, Codable { let id: String; let timestamp: Date; let price: MoneyAmount }
+enum ChartMarkerType: String, Codable, Sendable { case buy, sell, filled, closed, unknown; var label: String { switch self { case .buy, .filled: "ACHAT"; case .sell, .closed: "VENTE"; case .unknown: "TRANSACTION" } } }
+struct ChartMarker: Identifiable, Equatable, Sendable, Codable { let id: String; let timestamp: Date; let type: ChartMarkerType; let label: String; let price: MoneyAmount?; let quantity: Decimal?; let quoteAmount: MoneyAmount? }
+struct ChartLevels: Equatable, Sendable, Codable { let executionPrice: MoneyAmount?; let costBasisPrice: MoneyAmount?; let breakEvenPrice: MoneyAmount?; let minimumProfitableExitPrice: MoneyAmount? }
+struct SessionChart: Equatable, Sendable, Codable { let sessionID: String; let symbol: String; let displaySymbol: String; let quoteAsset: String; let timeframe: String?; let points: [ChartPoint]; let markers: [ChartMarker]; let levels: ChartLevels; let warnings: [Warning]; let serverTime: Date? }

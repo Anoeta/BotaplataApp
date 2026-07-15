@@ -1,0 +1,26 @@
+import Foundation
+
+protocol RealSessionHistoryRepository: Sendable {
+    func fetchTimeline(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> TimelinePage
+    func fetchOrders(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> OrdersPage
+    func fetchDecisions(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> DecisionsPage
+    func fetchChart(sessionID: String, accessToken: String) async throws -> SessionChart
+}
+
+struct RemoteRealSessionHistoryRepository: RealSessionHistoryRepository {
+    let client: APIClientProtocol
+    func fetchTimeline(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> TimelinePage { try await page(path: "/api/mobile/v1/real/sessions/\(sessionID)/timeline", page: page, pageSize: pageSize, accessToken: accessToken, map: { $0.mapped(warnings: $1, serverTime: $2) }) }
+    func fetchOrders(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> OrdersPage { try await page(path: "/api/mobile/v1/real/sessions/\(sessionID)/orders", page: page, pageSize: pageSize, accessToken: accessToken, map: { $0.mapped(warnings: $1, serverTime: $2) }) }
+    func fetchDecisions(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> DecisionsPage { try await page(path: "/api/mobile/v1/real/sessions/\(sessionID)/decisions", page: page, pageSize: pageSize, accessToken: accessToken, map: { $0.mapped(warnings: $1, serverTime: $2) }) }
+    func fetchChart(sessionID: String, accessToken: String) async throws -> SessionChart { do { let e: APIEnvelope<SessionChartDTO> = try await client.sendEnvelope(APIEndpoint(method: .get, path: "/api/mobile/v1/real/sessions/\(sessionID)/chart", headers: HTTPHeaders.bearer(accessToken)), body: Optional<EmptyBody>.none); guard let dto = e.data else { throw AuthenticationError.serverUnavailable }; return dto.mapped(warnings: e.warnings, serverTime: e.meta.serverTime) } catch { throw Self.map(error) } }
+    private func page<DTO: Decodable & Sendable, Model>(path: String, page: Int, pageSize: Int, accessToken: String, map: (DTO, [APIWarning], Date?) -> Model) async throws -> Model { do { let endpoint = APIEndpoint(method: .get, path: path, queryItems: [URLQueryItem(name: "page", value: "\(page)"), URLQueryItem(name: "page_size", value: "\(pageSize)")], headers: HTTPHeaders.bearer(accessToken)); let e: APIEnvelope<DTO> = try await client.sendEnvelope(endpoint, body: Optional<EmptyBody>.none); guard let dto = e.data else { throw AuthenticationError.serverUnavailable }; return map(dto, e.warnings, e.meta.serverTime) } catch { throw Self.map(error) } }
+    private static func map(_ error: Error) -> Error { switch error { case APIClientError.business(let e, _): return e; case APIClientError.backend(_, let p, _): return AuthenticationError(code: p.code); case APIClientError.httpStatus(401, _): return AuthenticationError.accessTokenExpired; case APIClientError.httpStatus(404, _): return AuthenticationError.validationError; case APIClientError.network: return AuthenticationError.offline; case APIClientError.timeout: return AuthenticationError.serverUnavailable; case APIClientError.cancelled: return CancellationError(); case let e as AuthenticationError: return e; default: return AuthenticationError.serverUnavailable } }
+}
+
+struct UnconfiguredRealSessionHistoryRepository: RealSessionHistoryRepository { func fetchTimeline(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> TimelinePage { throw AuthenticationError.notConfigured }; func fetchOrders(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> OrdersPage { throw AuthenticationError.notConfigured }; func fetchDecisions(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> DecisionsPage { throw AuthenticationError.notConfigured }; func fetchChart(sessionID: String, accessToken: String) async throws -> SessionChart { throw AuthenticationError.notConfigured } }
+struct MockRealSessionHistoryRepository: RealSessionHistoryRepository {
+    func fetchTimeline(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> TimelinePage { TimelinePage(items: PreviewFixtures.timelineEvents, pagination: RealSessionsPagination(page: page, pageSize: pageSize, total: PreviewFixtures.timelineEvents.count, hasMore: false), warnings: [], serverTime: PreviewFixtures.now) }
+    func fetchOrders(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> OrdersPage { OrdersPage(items: PreviewFixtures.sessionOrders, pagination: RealSessionsPagination(page: page, pageSize: pageSize, total: PreviewFixtures.sessionOrders.count, hasMore: false), warnings: [], serverTime: PreviewFixtures.now) }
+    func fetchDecisions(sessionID: String, page: Int, pageSize: Int, accessToken: String) async throws -> DecisionsPage { DecisionsPage(items: PreviewFixtures.sessionDecisions, pagination: RealSessionsPagination(page: page, pageSize: pageSize, total: PreviewFixtures.sessionDecisions.count, hasMore: false), warnings: [], serverTime: PreviewFixtures.now) }
+    func fetchChart(sessionID: String, accessToken: String) async throws -> SessionChart { PreviewFixtures.sessionChart }
+}
