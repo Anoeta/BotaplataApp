@@ -7,6 +7,10 @@ struct RootView: View {
     @Environment(ActiveSessionStore.self) private var activeSessionStore
     @Environment(RealSessionsStore.self) private var realSessionsStore
     @Environment(RealSessionHistoryStore.self) private var realSessionHistoryStore
+    @Environment(ProfileStore.self) private var profileStore
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var didEnterBackground = false
+    private let lockCoordinator = LocalBiometricLockCoordinator()
 
     var body: some View {
         @Bindable var router = router
@@ -17,7 +21,7 @@ struct RootView: View {
                     NavigationStack(path: $router.dashboardPath) { DashboardContainerView(store: activeSessionStore) }.tabItem { Label(AppTab.dashboard.title, systemImage: AppTab.dashboard.symbol) }.tag(AppTab.dashboard)
                     NavigationStack(path: $router.sessionsPath) { SessionsContainerView(store: realSessionsStore) }.tabItem { Label(AppTab.sessions.title, systemImage: AppTab.sessions.symbol) }.tag(AppTab.sessions)
                     NavigationStack(path: $router.journalPath) { JournalContainerView(historyStore: realSessionHistoryStore, sessionsStore: realSessionsStore) }.tabItem { Label(AppTab.journal.title, systemImage: AppTab.journal.symbol) }.tag(AppTab.journal)
-                    NavigationStack(path: $router.profilePath) { ProfileView(profile: PreviewFixtures.profile) }.tabItem { Label(AppTab.profile.title, systemImage: AppTab.profile.symbol) }.tag(AppTab.profile)
+                    NavigationStack(path: $router.profilePath) { ProfileContainerView(store: profileStore) }.tabItem { Label(AppTab.profile.title, systemImage: AppTab.profile.symbol) }.tag(AppTab.profile)
                 }
                 .tint(BotaplataColors.accent)
             case .restoring:
@@ -37,7 +41,14 @@ struct RootView: View {
             }
         }
         .onChange(of: appState.sessionState) { _, newState in
-            if newState == .loggedOut { Task { await activeSessionStore.purge(); await realSessionsStore.purge(); await realSessionHistoryStore.purge() } }
+            if newState == .loggedOut { Task { await activeSessionStore.purge(); await realSessionsStore.purge(); await realSessionHistoryStore.purge(); profileStore.purge() } }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { didEnterBackground = true }
+            if phase == .active {
+                if lockCoordinator.shouldLock(afterBackground: didEnterBackground, biometricEnabled: profileStore.biometricLockEnabled, state: appState.sessionState) { authStore.lockLocally() }
+                didEnterBackground = false
+            }
         }
     }
 }

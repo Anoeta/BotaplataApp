@@ -22,8 +22,23 @@ actor AuthenticationSession {
         do { let refreshed = try await task.value; try await apply(refreshed); refreshTask = nil; return refreshed } catch { refreshTask = nil; if matchesPurge(error) { try? await purgeLocal() }; throw error }
     }
     func logout() async { await repository.logout(accessToken: session?.accessToken); try? await purgeLocal() }
-    func authorizedDevices() async throws -> [AuthorizedDevice] { guard let token = session?.accessToken else { throw AuthenticationError.accessTokenExpired }; return try await repository.authorizedDevices(accessToken: token) }
-    func revokeDevice(id: String) async throws -> DeviceRevocationResult { guard let token = session?.accessToken else { throw AuthenticationError.accessTokenExpired }; let result = try await repository.revokeDevice(id: id, accessToken: token); if result.currentDeviceRevoked { try await purgeLocal() }; return result }
+    func authorizedDevices() async throws -> [AuthorizedDevice] {
+        try await withAccessTokenReplay { token in try await repository.authorizedDevices(accessToken: token) }
+    }
+    func revokeDevice(id: String) async throws -> DeviceRevocationResult {
+        let result = try await withAccessTokenReplay { token in try await repository.revokeDevice(id: id, accessToken: token) }
+        if result.currentDeviceRevoked { try await purgeLocal() }
+        return result
+    }
+    private func withAccessTokenReplay<T>(_ work: (String) async throws -> T) async throws -> T {
+        let token = try await validAccessTokenRefreshingIfNeeded()
+        do { return try await work(token) }
+        catch AuthenticationError.accessTokenExpired {
+            let replayToken = try await refresh().accessToken
+            do { return try await work(replayToken) }
+            catch AuthenticationError.accessTokenExpired { try? await purgeLocal(); throw AuthenticationError.accessTokenExpired }
+        }
+    }
     func purgeLocal() async throws { session = nil; try await tokenStore.purgeSession() }
     private func matchesPurge(_ error: Error) -> Bool { [AuthenticationError.refreshRevoked, .refreshReuseDetected, .deviceRevoked, .accessTokenExpired].contains(error as? AuthenticationError) }
 }
