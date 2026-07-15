@@ -6,6 +6,7 @@ struct RootView: View {
     @Environment(AuthenticationStore.self) private var authStore
     @Environment(ActiveSessionStore.self) private var activeSessionStore
     @Environment(RealSessionsStore.self) private var realSessionsStore
+    @Environment(RealSessionHistoryStore.self) private var realSessionHistoryStore
 
     var body: some View {
         @Bindable var router = router
@@ -15,7 +16,7 @@ struct RootView: View {
                 TabView(selection: $router.selectedTab) {
                     NavigationStack(path: $router.dashboardPath) { DashboardContainerView(store: activeSessionStore) }.tabItem { Label(AppTab.dashboard.title, systemImage: AppTab.dashboard.symbol) }.tag(AppTab.dashboard)
                     NavigationStack(path: $router.sessionsPath) { SessionsContainerView(store: realSessionsStore) }.tabItem { Label(AppTab.sessions.title, systemImage: AppTab.sessions.symbol) }.tag(AppTab.sessions)
-                    NavigationStack(path: $router.journalPath) { JournalView(events: PreviewFixtures.journalEvents) }.tabItem { Label(AppTab.journal.title, systemImage: AppTab.journal.symbol) }.tag(AppTab.journal)
+                    NavigationStack(path: $router.journalPath) { JournalContainerView(historyStore: realSessionHistoryStore, sessionsStore: realSessionsStore) }.tabItem { Label(AppTab.journal.title, systemImage: AppTab.journal.symbol) }.tag(AppTab.journal)
                     NavigationStack(path: $router.profilePath) { ProfileView(profile: PreviewFixtures.profile) }.tabItem { Label(AppTab.profile.title, systemImage: AppTab.profile.symbol) }.tag(AppTab.profile)
                 }
                 .tint(BotaplataColors.accent)
@@ -36,7 +37,7 @@ struct RootView: View {
             }
         }
         .onChange(of: appState.sessionState) { _, newState in
-            if newState == .loggedOut { Task { await activeSessionStore.purge(); await realSessionsStore.purge() } }
+            if newState == .loggedOut { Task { await activeSessionStore.purge(); await realSessionsStore.purge(); await realSessionHistoryStore.purge() } }
         }
     }
 }
