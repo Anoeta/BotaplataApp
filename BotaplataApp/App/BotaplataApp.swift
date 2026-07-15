@@ -8,6 +8,7 @@ struct BotaplataApp: App {
     @State private var activeSessionStore: ActiveSessionStore
     @State private var realSessionsStore: RealSessionsStore
     @State private var realSessionHistoryStore: RealSessionHistoryStore
+    @State private var profileStore: ProfileStore
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -31,6 +32,7 @@ struct BotaplataApp: App {
         _activeSessionStore = State(initialValue: ActiveSessionStore(repository: snapshotRepository, cache: FileActiveSessionCache(), authSession: auth.session, appState: state))
         _realSessionsStore = State(initialValue: RealSessionsStore(repository: sessionsRepository, cache: FileRealSessionsCache(), authSession: auth.session, appState: state))
         _realSessionHistoryStore = State(initialValue: RealSessionHistoryStore(repository: historyRepository, cache: FileRealSessionHistoryCache(), authSession: auth.session, appState: state))
+        _profileStore = State(initialValue: ProfileStore(authSession: auth.session, appState: state, authenticator: LocalAuthenticationBiometricAuthenticator(), preferences: UserDefaultsSecurityPreferencesStore()))
     }
 
     static func makeRepository(environment: AppEnvironment) -> AuthenticationRepository {
@@ -54,6 +56,6 @@ struct BotaplataApp: App {
     }
 
     var body: some Scene {
-        WindowGroup { RootView().environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).task { if appState.sessionState == .unknown { await authStore.restore() } } }
+        WindowGroup { RootView().environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).environment(profileStore).task { if appState.sessionState == .unknown { await authStore.restore() } } }
     }
 }
