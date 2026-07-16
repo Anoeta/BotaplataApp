@@ -20,22 +20,23 @@ struct BotaplataApp: App {
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
+        let isUITesting = arguments.contains("--botaplata-ui-tests")
         #if DEBUG
-        let demo = arguments.contains("--botaplata-demo-authenticated") || ProcessInfo.processInfo.environment["BOTAPLATA_DEBUG_DEMO"] == "1"
-        let environment: AppEnvironment = arguments.contains("--botaplata-ui-tests") ? .uiTesting : (demo ? .debugPreview : .development)
-        let state = AppState(sessionState: demo ? .authenticated : .unknown, environment: environment)
-        let repository: AuthenticationRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockAuthenticationRepository() : BotaplataApp.makeRepository(environment: environment)
+        let isExplicitDemo = arguments.contains("--botaplata-demo-authenticated") || ProcessInfo.processInfo.environment["BOTAPLATA_DEBUG_DEMO"] == "1"
+        let environment: AppEnvironment = isUITesting ? .uiTesting : (isExplicitDemo ? .debugPreview : .development)
         #else
+        let isExplicitDemo = false
         let environment: AppEnvironment = .production
-        let state = AppState(sessionState: .unknown, environment: environment)
-        let repository: AuthenticationRepository = BotaplataApp.makeRepository(environment: environment)
         #endif
+        let usesFixtures = isUITesting || isExplicitDemo
+        let state = AppState(sessionState: isExplicitDemo ? .authenticated : .unknown, environment: environment)
+        let repository: AuthenticationRepository = usesFixtures ? MockAuthenticationRepository() : BotaplataApp.makeRepository(environment: environment)
         let tokenStore: TokenStoreProtocol = KeychainTokenStore()
         let auth = AuthenticationStore(repository: repository, tokenStore: tokenStore, appState: state)
-        let snapshotRepository: RealActiveSnapshotRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockRealActiveSnapshotRepository() : BotaplataApp.makeSnapshotRepository(environment: environment)
-        let sessionsRepository: RealSessionsRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockRealSessionsRepository() : BotaplataApp.makeSessionsRepository(environment: environment)
-        let historyRepository: RealSessionHistoryRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockRealSessionHistoryRepository() : BotaplataApp.makeHistoryRepository(environment: environment)
-        let pushRepository: PushNotificationsRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockPushNotificationsRepository() : BotaplataApp.makePushRepository(environment: environment)
+        let snapshotRepository: RealActiveSnapshotRepository = usesFixtures ? MockRealActiveSnapshotRepository() : BotaplataApp.makeSnapshotRepository(environment: environment)
+        let sessionsRepository: RealSessionsRepository = usesFixtures ? MockRealSessionsRepository() : BotaplataApp.makeSessionsRepository(environment: environment)
+        let historyRepository: RealSessionHistoryRepository = usesFixtures ? MockRealSessionHistoryRepository() : BotaplataApp.makeHistoryRepository(environment: environment)
+        let pushRepository: PushNotificationsRepository = usesFixtures ? MockPushNotificationsRepository() : BotaplataApp.makePushRepository(environment: environment)
         _appState = State(initialValue: state)
         _authStore = State(initialValue: auth)
         _activeSessionStore = State(initialValue: ActiveSessionStore(repository: snapshotRepository, cache: FileActiveSessionCache(), authSession: auth.session, appState: state))

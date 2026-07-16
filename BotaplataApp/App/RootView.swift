@@ -42,7 +42,7 @@ struct RootView: View {
             }
         }
         .onChange(of: appState.sessionState) { _, newState in
-            if newState == .loggedOut { Task { await activeSessionStore.purge(); await realSessionsStore.purge(); await realSessionHistoryStore.purge(); await pushStore.purge(); profileStore.purge() } }
+            if [.loggedOut, .revoked, .expired].contains(newState) { Task { await activeSessionStore.purge(); await realSessionsStore.purge(); await realSessionHistoryStore.purge(); await pushStore.purge(); profileStore.purge() } }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { didEnterBackground = true }

@@ -23,5 +23,5 @@ import Observation
     private func applyListError(_ error: Error) { if visibleItems.isEmpty { content = .error("Impossible de charger les sessions") } else { content = .offline(visibleItems) } }
     var visibleItems: [SessionSummary] { switch content { case .loaded(let v), .loadedFromCache(let v), .refreshing(let v?), .partial(let v), .stale(let v), .offline(let v?): return v; default: return [] } }
     func visibleDetail(_ id: String) -> SessionDetail? { switch details[id] { case .loaded(let v), .loadedFromCache(let v), .refreshing(let v?), .offline(let v?), .stale(let v): return v; default: return nil } }
-    private static func authorized<T>(authSession: AuthenticationSession, operation: @escaping @Sendable (String) async throws -> T) async throws -> T { let token = try await authSession.validAccessTokenRefreshingIfNeeded(); do { return try await operation(token) } catch AuthenticationError.accessTokenExpired { let refreshed = try await authSession.refresh(); return try await operation(refreshed.accessToken) } }
+    private static func authorized<T>(authSession: AuthenticationSession, operation: @escaping @Sendable (String) async throws -> T) async throws -> T { try await authSession.withAccessTokenReplay(operation) }
 }

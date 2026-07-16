@@ -71,3 +71,7 @@ En V1, une notification reçue au foreground rafraîchit le summary et la liste 
 ## Validation Xcode manuelle
 
 Dans Xcode, vérifier la capability Push Notifications, Background Modes > Remote notifications, et l'entitlement `aps-environment`. Aucun `.p8`, certificat ou provisioning profile ne doit être committé.
+
+## Release readiness
+
+Voir `Docs/IOS_V1_RELEASE_READINESS.md` pour la checklist finale V1, TestFlight, réseau distant et sécurité cache/offline.

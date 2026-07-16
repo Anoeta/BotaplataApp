@@ -53,3 +53,7 @@ L'app iOS ne contacte pas Kraken/Binance directement, ne possède aucune clé ex
 18. Vérifier refresh.
 19. Logout.
 20. Vérifier purge du contenu authentifié.
+
+## Release readiness
+
+Voir `Docs/IOS_V1_RELEASE_READINESS.md` pour la checklist finale V1, TestFlight, réseau distant et sécurité cache/offline.
