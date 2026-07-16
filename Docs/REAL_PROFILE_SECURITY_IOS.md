@@ -57,3 +57,7 @@ Fixtures trouvées avant modification : `ProfileView(profile: PreviewFixtures.pr
 19. Vérifier absence de secret.
 20. Se déconnecter.
 21. Vérifier disparition de toutes les données authentifiées.
+
+## Release readiness
+
+Voir `Docs/IOS_V1_RELEASE_READINESS.md` pour la checklist finale V1, TestFlight, réseau distant et sécurité cache/offline.

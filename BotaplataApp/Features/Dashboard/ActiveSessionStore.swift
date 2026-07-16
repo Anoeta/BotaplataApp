@@ -23,12 +23,8 @@ final class ActiveSessionStore {
         if case .idle = content { content = .loading } else if let visible = visibleSnapshot { content = .refreshing(visible) }
         let task = Task { [repository, authSession, cache] in
             do {
-                let token = try await authSession.validAccessTokenRefreshingIfNeeded()
-                let snapshot: RealActiveSnapshot
-                do { snapshot = try await repository.fetchActiveSnapshot(accessToken: token) }
-                catch AuthenticationError.accessTokenExpired {
-                    let refreshed = try await authSession.refresh()
-                    snapshot = try await repository.fetchActiveSnapshot(accessToken: refreshed.accessToken)
+                let snapshot = try await authSession.withAccessTokenReplay { token in
+                    try await repository.fetchActiveSnapshot(accessToken: token)
                 }
                 try Task.checkCancellation()
                 let accepted = await MainActor.run { self.apply(snapshot, generation: generation) }

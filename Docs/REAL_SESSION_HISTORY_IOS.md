@@ -53,3 +53,7 @@ Les tests utilisent `ACCESS_TOKEN_SENTINEL`, `REFRESH_TOKEN_SENTINEL`, `PASSWORD
 19. Vérifier refresh.
 20. Logout.
 21. Vérifier purge du contenu authentifié.
+
+## Release readiness
+
+Voir `Docs/IOS_V1_RELEASE_READINESS.md` pour la checklist finale V1, TestFlight, réseau distant et sécurité cache/offline.
