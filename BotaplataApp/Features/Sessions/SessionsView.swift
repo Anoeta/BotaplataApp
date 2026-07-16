@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SessionsContainerView: View { @State var store: RealSessionsStore; @Environment(RealSessionHistoryStore.self) private var historyStore
-    var body: some View { SessionsView(content: store.content, warnings: store.warnings, loadNext: { id in await store.loadNextPageIfNeeded(currentItemID: id) }, refresh: { await store.refresh() }, detailContent: { id in store.details[id] ?? .idle }, loadDetail: { id in await store.loadDetail(id: id) }, historyStore: historyStore).task { store.start() } }
+    var body: some View { SessionsView(content: store.content, warnings: store.warnings, loadNext: { id in await store.loadNextPageIfNeeded(currentItemID: id) }, refresh: { await store.refresh() }, detailContent: { id in store.details[id] ?? .idle }, loadDetail: { id in await store.loadDetail(id: id) }, historyStore: historyStore).task { store.start() }.navigationDestination(for: SessionRoute.self) { route in switch route { case .detail(let id, _): SessionDetailContainerView(sessionID: id, content: store.details[id] ?? .idle, load: { await store.loadDetail(id: id) }, historyStore: historyStore) } } }
 }
 
 struct SessionsView: View {

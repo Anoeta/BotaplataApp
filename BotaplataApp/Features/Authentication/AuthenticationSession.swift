@@ -30,7 +30,7 @@ actor AuthenticationSession {
         if result.currentDeviceRevoked { try await purgeLocal() }
         return result
     }
-    private func withAccessTokenReplay<T>(_ work: (String) async throws -> T) async throws -> T {
+    func withAccessTokenReplay<T>(_ work: (String) async throws -> T) async throws -> T {
         let token = try await validAccessTokenRefreshingIfNeeded()
         do { return try await work(token) }
         catch AuthenticationError.accessTokenExpired {

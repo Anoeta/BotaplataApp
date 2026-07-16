@@ -34,3 +34,19 @@ extension PreviewFixtures {
     static let sessionDecisions: [SessionDecision] = [SessionDecision(id: "decision-wait", createdAt: now.addingTimeInterval(-300), decision: "wait", decisionLabel: "Attente", score: 2.4, scoreMin: 4, price: MoneyAmount(77.74, currency: "USDC"), controller: "real", blockers: ["Signal incomplet"], buyConditions: ["Liquidité suffisante"], sellConditions: [], advice: ["Continuer la surveillance"], summaryTitle: "Botaplata continue d'attendre.", summaryMessage: "Les conditions d'achat ne sont pas encore réunies.")]
     static let sessionChart = SessionChart(sessionID: "fixture-kraken-sol", symbol: "SOL/USDC", displaySymbol: "SOL/USDC", quoteAsset: "USDC", timeframe: "1m", points: [], markers: [ChartMarker(id: "marker-buy", timestamp: now.addingTimeInterval(-4200), type: .buy, label: "Achat confirmé", price: MoneyAmount(77.74, currency: "USDC"), quantity: 10.29071263, quoteAmount: MoneyAmount(799.99, currency: "USDC"))], levels: ChartLevels(executionPrice: MoneyAmount(77.74, currency: "USDC"), costBasisPrice: MoneyAmount(78.36, currency: "USDC"), breakEvenPrice: MoneyAmount(78.98, currency: "USDC"), minimumProfitableExitPrice: MoneyAmount(79.10, currency: "USDC")), warnings: [Warning(id: "chart_price_series_unavailable", severity: .information, title: "Courbe indisponible", message: "La courbe de prix n'est pas disponible pour cette session.")], serverTime: now)
 }
+
+extension PreviewFixtures {
+    static let notifications: [RealNotificationItem] = [
+        RealNotificationItem(id: "fixture-alert-buy", eventType: "real_buy_filled", severity: .info, title: "Achat confirmé par Kraken", message: "L'achat sur SOL/USDC a été confirmé.", createdAt: now.addingTimeInterval(-120), isRead: false, sessionID: krakenDetail.id, symbol: "SOL/USDC", provider: "kraken", navigationTarget: NotificationNavigationTarget(kind: .session, sessionID: krakenDetail.id, section: .journal), money: nil),
+        RealNotificationItem(id: "fixture-alert-watch", eventType: "real_reconciliation_prolonged", severity: .watch, title: "Vérification en cours", message: "Botaplata vérifie depuis plus longtemps que prévu l'état d'un ordre sur Kraken.", createdAt: now.addingTimeInterval(-840), isRead: false, sessionID: krakenDetail.id, symbol: "SOL/USDC", provider: "kraken", navigationTarget: NotificationNavigationTarget(kind: .session, sessionID: krakenDetail.id, section: .orders), money: nil),
+        RealNotificationItem(id: "fixture-alert-monitoring", eventType: "real_monitoring_degraded", severity: .warning, title: "Surveillance perturbée", message: "Botaplata rencontre actuellement un problème de surveillance sur cette session.", createdAt: now.addingTimeInterval(-86_400), isRead: true, sessionID: krakenDetail.id, symbol: "SOL/USDC", provider: "kraken", navigationTarget: NotificationNavigationTarget(kind: .session, sessionID: krakenDetail.id, section: .overview), money: nil)
+    ]
+    static let pushPreferences = PushPreferences(categories: [
+        PushPreferenceItem(eventType: "real_buy_filled", enabled: true, mandatory: false, severity: .info),
+        PushPreferenceItem(eventType: "real_sell_submitted", enabled: true, mandatory: false, severity: .info),
+        PushPreferenceItem(eventType: "real_sell_filled", enabled: true, mandatory: false, severity: .info),
+        PushPreferenceItem(eventType: "real_reconciliation_prolonged", enabled: true, mandatory: false, severity: .watch),
+        PushPreferenceItem(eventType: "real_monitoring_degraded", enabled: true, mandatory: false, severity: .warning),
+        PushPreferenceItem(eventType: "real_protection_triggered", enabled: true, mandatory: true, severity: .critical)
+    ], updatedAt: now)
+}

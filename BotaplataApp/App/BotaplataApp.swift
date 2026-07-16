@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @main
 struct BotaplataApp: App {
@@ -9,6 +12,11 @@ struct BotaplataApp: App {
     @State private var realSessionsStore: RealSessionsStore
     @State private var realSessionHistoryStore: RealSessionHistoryStore
     @State private var profileStore: ProfileStore
+    @State private var pushStore: PushNotificationsStore
+    @StateObject private var pushBridge = PushNotificationEventBridge()
+    #if canImport(UIKit)
+    @UIApplicationDelegateAdaptor(BotaplataAppDelegate.self) private var appDelegate
+    #endif
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -27,12 +35,14 @@ struct BotaplataApp: App {
         let snapshotRepository: RealActiveSnapshotRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockRealActiveSnapshotRepository() : BotaplataApp.makeSnapshotRepository(environment: environment)
         let sessionsRepository: RealSessionsRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockRealSessionsRepository() : BotaplataApp.makeSessionsRepository(environment: environment)
         let historyRepository: RealSessionHistoryRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockRealSessionHistoryRepository() : BotaplataApp.makeHistoryRepository(environment: environment)
+        let pushRepository: PushNotificationsRepository = arguments.contains("--botaplata-ui-tests") || demo ? MockPushNotificationsRepository() : BotaplataApp.makePushRepository(environment: environment)
         _appState = State(initialValue: state)
         _authStore = State(initialValue: auth)
         _activeSessionStore = State(initialValue: ActiveSessionStore(repository: snapshotRepository, cache: FileActiveSessionCache(), authSession: auth.session, appState: state))
         _realSessionsStore = State(initialValue: RealSessionsStore(repository: sessionsRepository, cache: FileRealSessionsCache(), authSession: auth.session, appState: state))
         _realSessionHistoryStore = State(initialValue: RealSessionHistoryStore(repository: historyRepository, cache: FileRealSessionHistoryCache(), authSession: auth.session, appState: state))
         _profileStore = State(initialValue: ProfileStore(authSession: auth.session, appState: state, authenticator: LocalAuthenticationBiometricAuthenticator(), preferences: UserDefaultsSecurityPreferencesStore()))
+        _pushStore = State(initialValue: PushNotificationsStore(repository: pushRepository, permissionManager: PushNotificationPermissionManager(), cache: FilePushNotificationsCache(), authSession: auth.session, appState: state))
     }
 
     static func makeRepository(environment: AppEnvironment) -> AuthenticationRepository {
@@ -55,7 +65,12 @@ struct BotaplataApp: App {
         return RemoteRealSessionHistoryRepository(client: APIClient(baseURL: baseURL))
     }
 
+    static func makePushRepository(environment: AppEnvironment) -> PushNotificationsRepository {
+        guard let baseURL = environment.baseURL else { return UnconfiguredPushNotificationsRepository() }
+        return RemotePushNotificationsRepository(client: APIClient(baseURL: baseURL))
+    }
+
     var body: some Scene {
-        WindowGroup { RootView().environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).environment(profileStore).task { if appState.sessionState == .unknown { await authStore.restore() } } }
+        WindowGroup { RootView().environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).environment(profileStore).environment(pushStore).task { BotaplataAppDelegate.bridge = pushBridge; pushBridge.onDeviceToken = { token in Task { await pushStore.registerDeviceToken(token) } }; pushBridge.onForeground = { Task { await pushStore.refreshAll() } }; pushBridge.onNotificationTap = { target, id in Task { await pushStore.handleNotificationTap(target: target, notificationID: id, router: router) } }; if appState.sessionState == .unknown { await authStore.restore() } } }
     }
 }
