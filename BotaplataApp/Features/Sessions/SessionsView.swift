@@ -11,7 +11,7 @@ struct SessionsView: View {
     var isOffline: Bool { if case .offline = content { true } else { false } }
     var sessionsSkeleton: some View { ForEach(0..<3, id: \.self) { _ in BotaplataCard { VStack(alignment: .leading) { Text("Chargement des sessions…").font(.headline); Text("Dernier état connu recherché").foregroundStyle(.secondary) } } } }
     func sections(_ items: [SessionSummary]) -> some View { Group { let active = items.filter { !$0.isHistorical }; let history = items.filter(\.isHistorical); if !active.isEmpty { Section("En cours") { rows(active) } }; if !history.isEmpty { Section("Historique") { rows(history) } } } }
-    func rows(_ items: [SessionSummary]) -> some View { ForEach(items) { session in NavigationLink(value: session.id) { SessionRow(session: session).task { await loadNext(session.id) } }.accessibilityLabel(accessibility(for: session)) }.navigationDestination(for: String.self) { id in SessionDetailContainerView(sessionID: id, content: detailContent(id), load: { await loadDetail(id) }, historyStore: historyStore) } }
+    func rows(_ items: [SessionSummary]) -> some View { ForEach(items) { session in NavigationLink(value: SessionRoute.detail(id: session.id, section: .overview)) { SessionRow(session: session).task { await loadNext(session.id) } }.accessibilityLabel(accessibility(for: session)) } }
     func accessibility(for s: SessionSummary) -> String { "\(s.pair.replacingOccurrences(of: "/", with: " ")), \(s.providerLabel ?? s.provider.displayName), \(DashboardPresentation.wording(for: s.lifecycle).title), \(s.runtimeHealth.label), \(freshnessText(s.freshness))." }
 }
 
