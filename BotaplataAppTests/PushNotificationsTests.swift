@@ -13,7 +13,9 @@ final class PushNotificationsTests: XCTestCase {
     }
 
     func testUnknownNavigationSectionFallsBackToOverview() throws {
-        let json = """{"kind":"session","session_id":"21","section":"unknown"}""".data(using: .utf8)!
+        let json = """
+        {"kind":"session","session_id":"21","section":"unknown"}
+        """.data(using: .utf8)!
         let target = try JSONCoding.decoder.decode(NotificationNavigationTarget.self, from: json)
         XCTAssertEqual(target.section, .overview)
     }
