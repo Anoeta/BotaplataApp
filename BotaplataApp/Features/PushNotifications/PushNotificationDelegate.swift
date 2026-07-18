@@ -2,6 +2,7 @@ import Foundation
 #if canImport(UserNotifications)
 import UserNotifications
 #endif
+import Combine
 
 @MainActor final class PushNotificationEventBridge: ObservableObject { var onDeviceToken: ((String) -> Void)?; var onNotificationTap: ((NotificationNavigationTarget?, String?) -> Void)?; var onForeground: (() -> Void)?; func receiveDeviceToken(_ data: Data) { onDeviceToken?(data.map { String(format: "%02x", $0) }.joined()) } }
 
@@ -18,3 +19,4 @@ final class BotaplataAppDelegate: NSObject, UIApplicationDelegate, UNUserNotific
 #endif
 
 enum PushPayloadParser { static func parse(_ userInfo: [AnyHashable: Any]) -> (target: NotificationNavigationTarget?, notificationID: String?) { let root = (userInfo["botaplata"] as? [String: Any]) ?? userInfo.reduce(into: [String: Any]()) { if let k = $1.key as? String { $0[k] = $1.value } }; let id = root["notification_id"] as? String ?? root["id"] as? String; let nav = root["navigation_target"] as? [String: Any] ?? root; guard let kindRaw = nav["kind"] as? String else { return (nil, id) }; let kind = NotificationNavigationTarget.Kind(rawValue: kindRaw) ?? .unknown; let section = NotificationNavigationTarget.Section(rawValue: nav["section"] as? String ?? "overview") ?? .overview; return (.init(kind: kind, sessionID: nav["session_id"] as? String, section: section), id) } }
+
