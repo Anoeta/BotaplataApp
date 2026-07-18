@@ -47,6 +47,20 @@ struct AuthenticatedSession: Equatable, Sendable {
     let deviceID: String
 }
 
+extension AuthenticatedSession {
+    init(dto: AuthenticationTokensDTO) {
+        self.init(
+            accessToken: dto.accessToken,
+            accessTokenExpiresAt: dto.accessTokenExpiresAt,
+            refreshToken: dto.refreshToken,
+            refreshTokenExpiresAt: dto.refreshTokenExpiresAt,
+            tokenType: dto.tokenType,
+            user: dto.user,
+            deviceID: dto.deviceID
+        )
+    }
+}
+
 struct AuthenticationTokensDTO: Codable, Equatable, Sendable {
     let accessToken: String; let accessTokenExpiresAt: Date; let refreshToken: String; let refreshTokenExpiresAt: Date; let tokenType: String; let deviceID: String; let user: AuthenticatedUser
     enum CodingKeys: String, CodingKey { case accessToken = "access_token", accessTokenExpiresAt = "access_token_expires_at", refreshToken = "refresh_token", refreshTokenExpiresAt = "refresh_token_expires_at", tokenType = "token_type", deviceID = "device_id", user }
