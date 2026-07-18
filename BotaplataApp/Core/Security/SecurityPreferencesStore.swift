@@ -7,8 +7,8 @@ protocol SecurityPreferencesStore: Sendable {
 
 actor UserDefaultsSecurityPreferencesStore: SecurityPreferencesStore {
     private let defaults: UserDefaults
-    private let key = "botaplata.security.biometricLockEnabled"
+    private nonisolated static let key = "botaplata.security.biometricLockEnabled"
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
-    func biometricLockEnabled() async -> Bool { defaults.bool(forKey: key) }
-    func setBiometricLockEnabled(_ enabled: Bool) async { defaults.set(enabled, forKey: key) }
+    func biometricLockEnabled() async -> Bool { defaults.bool(forKey: Self.key) }
+    func setBiometricLockEnabled(_ enabled: Bool) async { defaults.set(enabled, forKey: Self.key) }
 }
