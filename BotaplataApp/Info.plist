@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BOTAPLATA_API_BASE_URL</key>
+	<string>$(BOTAPLATA_API_BASE_URL)</string>
+	<key>INFOPLIST_KEY_NSFaceIDUsageDescription</key>
+	<string>Botaplata utilise Face ID pour verrouiller localement l’accès aux informations de votre bot.</string>
+</dict>
+</plist>
