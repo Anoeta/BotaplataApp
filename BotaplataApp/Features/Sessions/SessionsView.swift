@@ -109,7 +109,7 @@ struct SessionsView: View {
     @State private var searchText = ""
 
     var body: some View {
-        ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { header; banners; contentView }.padding() } }
+        ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { header; banners; contentView }.padding().safeAreaPadding(.bottom, BotaplataSpacing.xl) } }
             .navigationTitle("Sessions")
             .searchable(text: $searchText, prompt: "Paire, provider, stratégie")
             .refreshable { await refresh() }
@@ -124,7 +124,7 @@ struct SessionsView: View {
 }
 
 struct PremiumSessionCard: View { let session: SessionSummary
-    var body: some View { PremiumCard(variant: SessionsPresentation.shouldWatch(session) ? .warning : .normal) { VStack(alignment: .leading, spacing: 12) { HStack(alignment: .top) { VStack(alignment: .leading, spacing: 4) { Text(session.pair).font(BotaplataTypography.cardTitle); Text([session.strategyName, session.providerLabel ?? session.provider.displayName].compactMap { $0 }.joined(separator: " · ")).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary) }; Spacer(); StatusPill(status: SessionsPresentation.status(session), text: SessionsPresentation.statusText(session)) }; Text(SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.headline); Text(session.lifecycle.userMessage).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary).lineLimit(2); HStack { if let line = SessionsPresentation.pnlLine(session) { VStack(alignment: .leading) { Text(line.label).font(.caption).foregroundStyle(BotaplataColors.textMuted); Text(line.value == nil ? "Indisponible" : FinancialFormatters.money(line.value)).font(BotaplataTypography.monoValue).monospacedDigit() } }; Spacer(); FreshnessBadge(freshness: session.freshness) }; Text(freshnessText(session.freshness)).font(.caption).foregroundStyle(BotaplataColors.textMuted) } } }
+    var body: some View { PremiumCard(variant: SessionsPresentation.shouldWatch(session) ? .warning : .normal) { VStack(alignment: .leading, spacing: 12) { HStack(alignment: .top) { VStack(alignment: .leading, spacing: 4) { Text(session.pair).font(BotaplataTypography.cardTitle); Text([session.strategyName, session.providerLabel ?? session.provider.displayName].compactMap { $0 }.joined(separator: " · ")).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary) }; Spacer(); StatusPill(status: SessionsPresentation.status(session), text: SessionsPresentation.statusText(session)) }; Text(SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.headline); Text(session.lifecycle.userMessage).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary).lineLimit(2); HStack { if let line = SessionsPresentation.pnlLine(session) { VStack(alignment: .leading) { Text(line.label).font(.caption).foregroundStyle(BotaplataColors.textMuted); Text(line.value == nil ? "Indisponible" : FinancialFormatters.money(line.value)).font(BotaplataTypography.monoValue).foregroundStyle(BotaplataColors.textPrimary).monospacedDigit() } }; Spacer(); FreshnessBadge(freshness: session.freshness) }; Text(freshnessText(session.freshness)).font(.caption).foregroundStyle(BotaplataColors.textMuted) } } }
 }
 
 struct SessionDetailContainerView: View { let sessionID: String; let initialSection: NotificationNavigationTarget.Section; let content: LoadedContent<SessionDetail>; let load: () async -> Void; let historyStore: RealSessionHistoryStore?
@@ -146,7 +146,7 @@ struct SessionDetailContent: View { let session: SessionDetail; let selectedSect
     var feeAwareCard: some View { PremiumCard { VStack(alignment:.leading, spacing: 8) { Text("Frais / rentabilité").font(BotaplataTypography.cardTitle); ForEach(SessionsPresentation.feeAwareRows(session.feeAware), id: \.0) { row($0.0, $0.1) }; Text("Ces estimations proviennent du backend Botaplata.").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } }
     var healthCard: some View { PremiumCard { VStack(alignment:.leading, spacing: 8) { Text("Santé et fraîcheur").font(BotaplataTypography.cardTitle); row("Surveillance", session.runtimeHealth.label); row("Fraîcheur", freshnessText(session.freshness)); row("Mode", session.executionMode.rawValue) } } }
     var pnlCard: some View { PremiumCard { VStack(alignment:.leading, spacing: 8) { Text("Données financières").font(BotaplataTypography.cardTitle); row("Résultat latent", FinancialFormatters.money(session.pnl?.gross)); row("Résultat net estimé", FinancialFormatters.money(session.pnl?.netEstimated)); row("Résultat net réalisé", FinancialFormatters.money(session.pnl?.realizedNet)) } } }
-    func row(_ k: String, _ v: String) -> some View { HStack { Text(k); Spacer(); Text(v == "—" ? "Indisponible" : v).monospacedDigit().multilineTextAlignment(.trailing) } }
+    func row(_ k: String, _ v: String) -> some View { PremiumKeyValueRow(label: k, value: v, monospaced: true) }
 }
 
 extension NotificationNavigationTarget.Section { var title: String { switch self { case .overview: "Vue d’ensemble"; case .journal: "Journal"; case .orders: "Ordres"; case .decisions: "Décisions"; case .chart: "Graphique" } } }

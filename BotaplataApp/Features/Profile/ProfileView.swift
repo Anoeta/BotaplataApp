@@ -26,7 +26,7 @@ struct ProfileView: View {
             .sheet(isPresented: $showingAbout) { NavigationStack { AboutBotaplataView(diagnostic: store.diagnostic) } }
             .navigationDestination(isPresented: $showingDiagnostic) { DiagnosticView(diagnostic: store.diagnostic, permissionStatus: pushStore.permissionStatus) }
             .alert("Se déconnecter de Botaplata ?", isPresented: $confirmsLogout) { Button("Annuler", role: .cancel) {}; Button("Se déconnecter", role: .destructive) { Task { await logout() } } } message: { Text("Vous devrez saisir à nouveau votre mot de passe et votre code de vérification.") }
-            .overlay(alignment: .bottom) { if let message = store.message { Text(message).font(.footnote).padding().background(.thinMaterial, in: Capsule()).padding().accessibilityLabel(message) } }
+            .overlay(alignment: .bottom) { if let message = store.message { Text(message).font(.footnote).padding().background(BotaplataColors.backgroundElevated.opacity(0.96), in: Capsule()).foregroundStyle(BotaplataColors.textPrimary).padding().accessibilityLabel(message) } }
     }
 
     private var header: some View { ProfileUserCard(user: store.user) }
