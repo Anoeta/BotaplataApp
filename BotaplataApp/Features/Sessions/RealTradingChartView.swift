@@ -20,12 +20,65 @@ struct RealTradingChartSection: View { let session: SessionDetail; @Environment(
 
 struct RealTradingChartView: View { let state: RealSessionChartState; let selectedRange: TradingChartRange; let select: (TradingChartRange) -> Void; let refresh: () -> Void; @State private var showVWAP = true; @State private var showEMA200 = true; @State private var showBollinger = false; @State private var selected: ChartRenderableCandle?
     var body: some View { ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { ChartRangeSelector(selected: selectedRange, select: select); content }.padding() } }
-    @ViewBuilder private var content: some View { switch state { case .idle, .loading: PremiumSkeletonCard(); PremiumSkeletonCard(); case .failed(let e): PremiumErrorState(title: e.title, message: e.message); case .loaded(let c), .refreshing(let c), .offline(let c): let m = RealTradingChartRenderModel.make(chart: c); if case .offline = state { PremiumOfflineBanner() }; if c.candles.isEmpty { PremiumEmptyState(title: "Graphique en préparation", message: c.warnings.first?.message ?? "Le serveur ne dispose pas encore d’un historique de prix suffisant pour afficher le graphique."); ForEach(c.warnings) { WarningBanner(warning: $0) } } else { MarketSummary(chart: c); IndicatorControls(model: m, showVWAP: $showVWAP, showEMA200: $showEMA200, showBollinger: $showBollinger); CandlestickChart(model: m, showVWAP: showVWAP, showEMA200: showEMA200, showBollinger: showBollinger, selected: $selected); if m.hasVolume { VolumeChart(candles: m.candles) }; ChartLevelsSummary(levels: c.levels, quote: c.quoteAsset); ChartLegend(model: m, showVWAP: showVWAP, showEMA200: showEMA200, showBollinger: showBollinger); ForEach(c.warnings) { WarningBanner(warning: $0) }; Text("Dernière actualisation : \(HistoryPresentation.fullDate(c.generatedAt))").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } }
+    
+    @ViewBuilder private var content: some View {
+        switch state {
+        case .idle, .loading:
+            VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+                PremiumSkeletonCard()
+                PremiumSkeletonCard()
+            }
+        case .failed(let e):
+            PremiumErrorState(title: e.title, message: e.message)
+        case .loaded(let c), .refreshing(let c), .offline(let c):
+            let m = RealTradingChartRenderModel.make(chart: c)
+            VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+                if case .offline = state {
+                    PremiumOfflineBanner()
+                }
+                if c.candles.isEmpty {
+                    PremiumEmptyState(
+                        title: "Graphique en préparation",
+                        message: c.warnings.first?.message ?? "Le serveur ne dispose pas encore d’un historique de prix suffisant pour afficher le graphique."
+                    )
+                    ForEach(c.warnings) { WarningBanner(warning: $0) }
+                } else {
+                    MarketSummary(chart: c)
+                    IndicatorControls(model: m, showVWAP: $showVWAP, showEMA200: $showEMA200, showBollinger: $showBollinger)
+                    CandlestickChart(model: m, showVWAP: showVWAP, showEMA200: showEMA200, showBollinger: showBollinger, selected: $selected)
+                    if m.hasVolume { VolumeChart(candles: m.candles) }
+                    ChartLevelsSummary(levels: c.levels, quote: c.quoteAsset)
+                    ChartLegend(model: m, showVWAP: showVWAP, showEMA200: showEMA200, showBollinger: showBollinger)
+                    ForEach(c.warnings) { WarningBanner(warning: $0) }
+                    Text("Dernière actualisation : \(HistoryPresentation.fullDate(c.generatedAt))")
+                        .font(.caption)
+                        .foregroundStyle(BotaplataColors.textSecondary)
+                }
+            }
+        }
+    }
 }
 struct ChartRangeSelector: View { let selected: TradingChartRange; let select: (TradingChartRange) -> Void; var body: some View { HStack { ForEach(TradingChartRange.allCases, id: \.self) { r in Button(r.displayTitle) { select(r) }.buttonStyle(.borderedProminent).tint(r == selected ? BotaplataColors.primaryTeal : BotaplataColors.elevated).accessibilityLabel("Période \(r.displayTitle), \(r == selected ? "sélectionnée" : "non sélectionnée")") } } } }
 struct CandlestickChart: View { let model: RealTradingChartRenderModel; let showVWAP: Bool; let showEMA200: Bool; let showBollinger: Bool; @Binding var selected: ChartRenderableCandle?; var body: some View { PremiumCard { GeometryReader { outer in Chart { ForEach(model.candles) { c in RuleMark(x: .value("Date", c.openTime), yStart: .value("Bas", c.low), yEnd: .value("Haut", c.high)).foregroundStyle(c.positive ? BotaplataColors.success : BotaplataColors.danger); RectangleMark(x: .value("Date", c.openTime), yStart: .value("Ouverture", c.open), yEnd: .value("Clôture", c.close), width: .fixed(TradingChartPresentation.candleWidth(availableWidth: outer.size.width, candleCount: model.candles.count))).foregroundStyle(c.positive ? BotaplataColors.success : BotaplataColors.danger).opacity(c.isClosed ? 1 : 0.55).accessibilityLabel("Bougie \(c.isClosed ? "clôturée" : "ouverte") ouverture \(c.open) haut \(c.high) bas \(c.low) clôture \(c.close)") }
                 indicator(showVWAP, model.vwapSegments, "VWAP", BotaplataColors.accentCyan); indicator(showEMA200, model.ema200Segments, "EMA200", BotaplataColors.warning); indicator(showBollinger, model.bollingerUpperSegments, "Bollinger haute", BotaplataColors.textMuted); indicator(showBollinger, model.bollingerMiddleSegments, "Bollinger centrale", BotaplataColors.textSecondary); indicator(showBollinger, model.bollingerLowerSegments, "Bollinger basse", BotaplataColors.textMuted); ForEach(model.markers) { m in PointMark(x: .value("Date", m.timestamp), y: .value("Prix", m.price)).symbol { Image(systemName: m.kind == .sell || m.kind == .partialSell ? "arrow.down.circle.fill" : "arrow.up.circle.fill") }.foregroundStyle(m.kind == .sell || m.kind == .partialSell ? BotaplataColors.danger : BotaplataColors.success).accessibilityLabel("Marqueur \(m.title) prix \(m.price)") }; ForEach(model.levels) { l in RuleMark(y: .value(l.title, l.price)).foregroundStyle(BotaplataColors.accentCyan.opacity(0.55)).annotation(position: .top, alignment: .leading) { Text(l.title).font(.caption2).offset(y: l.offset).foregroundStyle(BotaplataColors.textSecondary) }.accessibilityLabel("Niveau \(l.title) \(l.price)") }; if let selected { RuleMark(x: .value("Sélection", selected.openTime)).foregroundStyle(BotaplataColors.textPrimary).lineStyle(.init(lineWidth: 1, dash: [4])); PointMark(x: .value("Date", selected.openTime), y: .value("Clôture", selected.close)).foregroundStyle(BotaplataColors.textPrimary) } }.chartYScale(domain: model.priceDomain ?? 0...1).chartXAxis { AxisMarks(values: .automatic(desiredCount: 5)) { AxisGridLine(); AxisTick(); AxisValueLabel(format: TradingChartPresentation.axisFormat(for: model.chart.range)) } }.chartOverlay { proxy in GeometryReader { geo in Rectangle().fill(.clear).contentShape(Rectangle()).gesture(DragGesture(minimumDistance: 0).onChanged { value in let origin = geo[proxy.plotAreaFrame].origin; let x = value.location.x - origin.x; if let date: Date = proxy.value(atX: x) { selected = TradingChartPresentation.nearestCandle(to: date, in: model.candles) } }.onEnded { _ in selected = nil }) } }.overlay(alignment: selected?.openTime ?? .distantPast < (model.candles[safe: model.candles.count / 2]?.openTime ?? .distantPast) ? .topTrailing : .topLeading) { if let selected { ChartTooltip(candle: selected, quote: model.chart.quoteAsset).frame(maxWidth: min(260, outer.size.width * 0.75)).padding(8) } }.frame(height: 300).accessibilityElement(children: .contain).accessibilityLabel(accessibilitySummary(model: model)) } } }
-    @ChartContentBuilder private func indicator(_ visible: Bool, _ segments: [[ChartIndicatorPoint]], _ label: String, _ color: Color) -> some ChartContent { if visible { ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in ForEach(segment) { p in LineMark(x: .value("Date", p.date), y: .value(label, p.value), series: .value("Segment", p.segment)).foregroundStyle(color) } } } }
+    @ChartContentBuilder
+    private func indicator(_ visible: Bool, _ segments: [[ChartIndicatorPoint]], _ label: String, _ color: Color) -> some ChartContent {
+        if visible {
+            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                ForEach(segment) { p in
+                    LineMark(
+                        x: .value("Date", p.date),
+                        y: .value(label, p.value),
+                        series: .value("Segment", p.segment)
+                    )
+                    .foregroundStyle(color)
+                }
+            }
+        } else {
+            // Explicitly emit empty chart content so the builder has a value for all branches
+            Group {}
+        }
+    }
     private func accessibilitySummary(model: RealTradingChartRenderModel) -> String { let high = model.candles.map(\.high).max() ?? 0; let low = model.candles.map(\.low).min() ?? 0; let last = model.candles.last?.close ?? 0; return "Graphique \(model.chart.displaySymbol) sur \(model.chart.range.displayTitle). \(model.candles.count) bougies. Dernier prix \(last) \(model.chart.quoteAsset). Plus haut \(high). Plus bas \(low)." }
 }
 extension Array { subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil } }
@@ -38,3 +91,4 @@ struct ChartLevelsSummary: View { let levels: TradingLevels; let quote: String; 
     private func row(_ t: String, _ v: Decimal?) -> some View { PremiumKeyValueRow(label: t, value: FinancialFormatters.decimal(v, suffix: quote)) } }
 struct ChartLegend: View { let model: RealTradingChartRenderModel; let showVWAP: Bool; let showEMA200: Bool; let showBollinger: Bool; var body: some View { Text("Légende : hausse/baisse, bougie ouverte, marqueurs backend, niveaux persistés\(model.hasVWAP && showVWAP ? ", VWAP" : "")\(model.hasEMA200 && showEMA200 ? ", EMA200" : "")\(model.hasBollinger && showBollinger ? ", Bollinger" : "").").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } }
 extension FinancialFormatters { static func decimal(_ value: Decimal?, suffix: String) -> String { guard let value else { return "—" }; return "\(NSDecimalNumber(decimal: value).stringValue) \(suffix)" } }
+
