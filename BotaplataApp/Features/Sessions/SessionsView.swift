@@ -489,8 +489,7 @@ struct SessionDetailContent: View {
     }
 
     @ViewBuilder private var chart: some View {
-        if let historyStore { SessionChartView(session: session, store: historyStore) }
-        else { ChartContent(chart: PreviewFixtures.sessionChart) }
+        RealTradingChartSection(session: session)
     }
 
     private var stateCard: some View {
