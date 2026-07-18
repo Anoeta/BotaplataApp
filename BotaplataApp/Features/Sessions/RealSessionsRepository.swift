@@ -10,7 +10,7 @@ struct RemoteRealSessionsRepository: RealSessionsRepository {
     func fetchSessions(page: Int, pageSize: Int, accessToken: String) async throws -> RealSessionsPage {
         do {
             let endpoint = APIEndpoint(method: .get, path: "/api/mobile/v1/real/sessions", queryItems: [URLQueryItem(name: "page", value: "\(page)"), URLQueryItem(name: "page_size", value: "\(pageSize)")], headers: HTTPHeaders.bearer(accessToken))
-            let envelope: APIEnvelope<RealSessionsPageDTO> = try await client.sendEnvelope(endpoint, body: Optional<EmptyBody>.none)
+            let envelope: APIEnvelope<RealSessionsPageDTO> = try await client.sendEnvelope(endpoint)
             guard let dto = envelope.data else { throw AuthenticationError.serverUnavailable }
             return dto.mapped(warnings: envelope.warnings, serverTime: envelope.meta.serverTime)
         } catch APIClientError.business(let error, _) { throw error }
@@ -24,7 +24,7 @@ struct RemoteRealSessionsRepository: RealSessionsRepository {
     }
     func fetchSessionDetail(id: String, accessToken: String) async throws -> SessionDetail {
         do {
-            let envelope: APIEnvelope<RealSessionDetailDTO> = try await client.sendEnvelope(APIEndpoint(method: .get, path: "/api/mobile/v1/real/sessions/\(id)", headers: HTTPHeaders.bearer(accessToken)), body: Optional<EmptyBody>.none)
+            let envelope: APIEnvelope<RealSessionDetailDTO> = try await client.sendEnvelope(APIEndpoint(method: .get, path: "/api/mobile/v1/real/sessions/\(id)", headers: HTTPHeaders.bearer(accessToken)))
             guard let dto = envelope.data else { throw AuthenticationError.serverUnavailable }
             return dto.mapped(warnings: envelope.warnings)
         } catch APIClientError.business(let error, _) { throw error }

@@ -3,7 +3,6 @@ import Foundation
 import FoundationNetworking
 #endif
 
-struct EmptyBody: Encodable, Sendable {}
 struct EmptyResponse: Codable, Sendable {}
 
 enum APIClientError: Error, Sendable {
@@ -16,13 +15,28 @@ struct APIClient: APIClientProtocol {
     let timeout: TimeInterval
     init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 20) { self.baseURL = baseURL; self.session = session; self.timeout = timeout }
 
-    func send<Response: Decodable & Sendable, Body: Encodable & Sendable>(_ endpoint: APIEndpoint, body: Body? = Optional<EmptyBody>.none) async throws -> Response {
+    func send<Response: Decodable & Sendable>(_ endpoint: APIEndpoint) async throws -> Response {
+        let envelope: APIEnvelope<Response> = try await sendEnvelope(endpoint)
+        guard let payload = envelope.data else { throw APIClientError.decoding }
+        return payload
+    }
+
+    func sendEnvelope<Response: Decodable & Sendable>(_ endpoint: APIEndpoint) async throws -> APIEnvelope<Response> {
+        try await sendEnvelope(endpoint, encodedBody: nil)
+    }
+
+    func send<Response: Decodable & Sendable, Body: Encodable & Sendable>(_ endpoint: APIEndpoint, body: Body) async throws -> Response {
         let envelope: APIEnvelope<Response> = try await sendEnvelope(endpoint, body: body)
         guard let payload = envelope.data else { throw APIClientError.decoding }
         return payload
     }
 
-    func sendEnvelope<Response: Decodable & Sendable, Body: Encodable & Sendable>(_ endpoint: APIEndpoint, body: Body? = Optional<EmptyBody>.none) async throws -> APIEnvelope<Response> {
+    func sendEnvelope<Response: Decodable & Sendable, Body: Encodable & Sendable>(_ endpoint: APIEndpoint, body: Body) async throws -> APIEnvelope<Response> {
+        let encodedBody = try JSONCoding.encoder.encode(body)
+        return try await sendEnvelope(endpoint, encodedBody: encodedBody)
+    }
+
+    private func sendEnvelope<Response: Decodable & Sendable>(_ endpoint: APIEndpoint, encodedBody: Data?) async throws -> APIEnvelope<Response> {
         var components = URLComponents(url: baseURL.appendingPathComponent(endpoint.path), resolvingAgainstBaseURL: false)
         if !endpoint.queryItems.isEmpty { components?.queryItems = endpoint.queryItems }
         guard let url = components?.url else { throw APIClientError.invalidURL }
@@ -32,7 +46,10 @@ struct APIClient: APIClientProtocol {
         request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
         request.setValue("no-cache", forHTTPHeaderField: "Pragma")
         endpoint.headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-        if let body { request.httpBody = try JSONCoding.encoder.encode(body); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        if let encodedBody {
+            request.httpBody = encodedBody
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw APIClientError.network }
