@@ -53,3 +53,11 @@ Le Dashboard et la vue d’ensemble de session consomment les modèles domaine d
 | Warnings | Les warnings backend structurés sont affichés avec leur message d’origine et sans doublon volontaire. | Aucun message reconstruit quand le backend fournit déjà `message`. |
 | Sections | Le détail conserve `SessionRoute.detail(id:section:)` pour l’entrée et utilise une sélection locale ensuite. | Les pills ne créent plus de nouvelle route; le store de détail et le store d’historique sont conservés. |
 | Graphique | Affiche l’état “Graphique en préparation” quand `points` est vide et liste les marqueurs/niveaux disponibles. | Aucune série OHLCV, RSI, Bollinger, ADX, EMA200, ATR ou courbe fictive n’est inventée sur iPhone. |
+
+## Real session chart endpoint
+
+Source backend contract commit: `599bb55b4b7c51969f74ca45c3821c01be42a4be`.
+
+`GET /api/mobile/v1/real/sessions/{session_id}/chart` maps to `RealSessionChartDTO`, `RealChartCandleDTO`, `RealChartMarkerDTO` and `RealChartLevelsDTO`. Envelope warnings stay on `APIEnvelope<T>`. Financial fields decode through `DecimalString`; the domain model keeps `Decimal` until the rendering-only Swift Charts adapter.
+
+The supported ranges are `1h`, `6h`, `24h` and `7d`. The iOS mapper preserves backend timeframe, data source, completion state, pagination cursor, warnings, markers and levels. Invalid OHLCV candles are filtered without interpolation or correction.

@@ -76,3 +76,15 @@ extension PreviewFixtures {
         SessionDetail(id: waitingBuyFill.id, pair: waitingBuyFill.pair, provider: waitingBuyFill.provider, lifecycle: .reconciliationPending, runtimeHealth: .healthy, freshness: fresh, currentPrice: waitingBuyFill.currentPrice, position: nil, decision: waitingBuyFill.decision, activeOrder: TradingOrderSummary(id: "KRAKEN_ORDER_SENTINEL", side: "BUY", status: .reconciliationRequired, message: "Botaplata vérifie encore l’état de cet ordre sur Kraken.", requestedQuantity: 1.25, executedQuantity: 0, limitPrice: .init(74.68), averageExecutionPrice: nil, createdAt: now.addingTimeInterval(-600), updatedAt: now.addingTimeInterval(-60)), reconciliation: Warning(id: "reconciliation", severity: .warning, title: "Vérification nécessaire", message: "Botaplata vérifie encore l’état de cet ordre sur Kraken."), pnl: nil, feeAware: feePartial, warnings: [])
     }
 }
+
+extension PreviewFixtures {
+    static func tradingChart(range: TradingChartRange = .sixHours) -> TradingChart {
+        let base = now.addingTimeInterval(-3600)
+        let candles = (0..<24).map { i -> TradingCandle in
+            let open = Decimal(74) + Decimal(i) / 10
+            let close = open + (i % 2 == 0 ? Decimal(string: "0.18")! : Decimal(string: "-0.12")!)
+            return TradingCandle(id: "c\(i)", openTime: base.addingTimeInterval(Double(i * 60)), closeTime: base.addingTimeInterval(Double((i + 1) * 60)), isClosed: i != 23, open: open, high: max(open, close) + Decimal(string: "0.25")!, low: min(open, close) - Decimal(string: "0.20")!, close: close, volume: Decimal(100 + i), vwap: open + Decimal(string: "0.05")!, ema200: open - Decimal(string: "0.10")!, bollingerUpper: open + Decimal(string: "0.60")!, bollingerMiddle: open, bollingerLower: open - Decimal(string: "0.60")!)
+        }
+        return TradingChart(sessionID: "fixture-kraken-sol", symbol: "SOLUSDC", displaySymbol: "SOL/USDC", quoteAsset: "USDC", range: range, timeframe: "1m", generatedAt: now, dataSource: "persisted_ohlcv", isComplete: true, hasMore: false, nextBefore: nil, candles: candles, markers: [TradingMarker(id: "buy", kind: .buy, timestamp: base, price: 74, quantity: 10, orderID: "OID-BUY", label: "Achat confirmé")], levels: TradingLevels(entryPrice: 74, breakEvenPrice: 74.4, minimumProfitableExitPrice: 74.8, trailingStopPrice: nil), warnings: [])
+    }
+}

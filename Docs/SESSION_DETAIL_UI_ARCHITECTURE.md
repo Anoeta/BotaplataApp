@@ -13,3 +13,9 @@ Chaque section possède son propre conteneur principal :
 - Graphique : `ScrollView` dédié, état vide explicite si la série de prix est absente.
 
 Aucune donnée de trading n’est inventée côté iOS : les PnL, frais, prix de rentabilité, marqueurs et conditions proviennent du backend Mobile V1. Les valeurs `nil` sont masquées localement plutôt que converties en zéros.
+
+## Real trading chart section
+
+The `.chart` section uses the dedicated real trading chart component and store. The selected detail section controls lifecycle: entering chart loads the selected range, leaving chart cancels in-flight work and keeps the memory cache. Range changes are local state, not navigation routes, and do not recreate the session detail store.
+
+The section is one scrollable container containing range selector, market summary, candlestick chart, indicator controls, legend, levels, warnings and last update. It does not embed a `List` inside the detail scroll view and does not start permanent polling.
