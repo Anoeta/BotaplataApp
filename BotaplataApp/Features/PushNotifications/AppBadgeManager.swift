@@ -4,7 +4,7 @@ import UIKit
 import UserNotifications
 #endif
 
-protocol AppBadgeManaging: Sendable { func setBadgeCount(_ count: Int) async }
+protocol AppBadgeManaging: Sendable { @MainActor func setBadgeCount(_ count: Int) async }
 struct AppBadgeManager: AppBadgeManaging {
     @MainActor func setBadgeCount(_ count: Int) async {
         #if canImport(UIKit)
@@ -12,4 +12,4 @@ struct AppBadgeManager: AppBadgeManaging {
         #endif
     }
 }
-struct MockAppBadgeManager: AppBadgeManaging { func setBadgeCount(_ count: Int) async {} }
+struct MockAppBadgeManager: AppBadgeManaging { @MainActor func setBadgeCount(_ count: Int) async {} }

@@ -1,6 +1,6 @@
 import Foundation
 
-struct APIEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
+struct APIEnvelope<Payload: Decodable & Sendable>: Decodable, Sendable {
     let ok: Bool
     let version: String
     let data: Payload?

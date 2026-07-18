@@ -7,7 +7,7 @@ import UIKit
 #endif
 
 enum PushAuthorizationStatus: String, Codable, Sendable { case notDetermined, denied, authorized, provisional, ephemeral, unknown }
-protocol PushNotificationPermissionManaging: Sendable { func authorizationStatus() async -> PushAuthorizationStatus; func requestAuthorizationAndRegister() async throws -> PushAuthorizationStatus }
+protocol PushNotificationPermissionManaging: Sendable { func authorizationStatus() async -> PushAuthorizationStatus; @MainActor func requestAuthorizationAndRegister() async throws -> PushAuthorizationStatus }
 struct PushNotificationPermissionManager: PushNotificationPermissionManaging {
     func authorizationStatus() async -> PushAuthorizationStatus {
         #if canImport(UserNotifications)
@@ -28,7 +28,7 @@ struct PushNotificationPermissionManager: PushNotificationPermissionManaging {
         #endif
     }
 }
-struct MockPushNotificationPermissionManager: PushNotificationPermissionManaging { var status: PushAuthorizationStatus = .authorized; func authorizationStatus() async -> PushAuthorizationStatus { status }; func requestAuthorizationAndRegister() async throws -> PushAuthorizationStatus { status } }
+struct MockPushNotificationPermissionManager: PushNotificationPermissionManaging { var status: PushAuthorizationStatus = .authorized; func authorizationStatus() async -> PushAuthorizationStatus { status }; @MainActor func requestAuthorizationAndRegister() async throws -> PushAuthorizationStatus { status } }
 #if canImport(UserNotifications)
 extension PushAuthorizationStatus { init(_ status: UNAuthorizationStatus) { switch status { case .notDetermined: self = .notDetermined; case .denied: self = .denied; case .authorized: self = .authorized; case .provisional: self = .provisional; case .ephemeral: self = .ephemeral; @unknown default: self = .unknown } } }
 #endif
