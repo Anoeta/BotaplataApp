@@ -1,0 +1,51 @@
+{
+  "ok": true,
+  "version": "mobile_v1",
+  "data": {
+    "items": [
+      {
+        "id": "real-session-001",
+        "name": "SOL real",
+        "provider": "kraken",
+        "provider_label": "Kraken",
+        "execution_mode": "real",
+        "symbol": "SOLUSDC",
+        "display_symbol": "SOL/USDC",
+        "status": "active",
+        "lifecycle_state": "waiting_buy",
+        "monitoring": {
+          "health": "healthy"
+        },
+        "freshness": {
+          "status": "fresh"
+        },
+        "position": null,
+        "active_order": null,
+        "strategy": {
+          "key": "star_v3",
+          "display_name": "Star V3"
+        },
+        "updated_at": "2026-07-18T10:00:00Z",
+        "unrealized_pnl_quote": null,
+        "realized_pnl_net_quote": null
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "page_size": 20,
+      "total": 1,
+      "has_more": false
+    }
+  },
+  "error": null,
+  "meta": {
+    "request_id": "req-contract",
+    "server_time": "2026-07-18T10:00:00Z"
+  },
+  "warnings": [
+    {
+      "code": "monitoring_degraded",
+      "message": "La surveillance de cette session rencontre actuellement un probl\u00e8me."
+    }
+  ]
+}

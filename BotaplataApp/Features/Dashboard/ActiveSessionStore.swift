@@ -45,5 +45,5 @@ final class ActiveSessionStore {
 }
 
 private extension AuthenticationError {
-    var dashboardMessage: String { switch self { case .notConfigured: return "Botaplata ne peut pas encore joindre son serveur depuis cette version de l'application."; case .offline: return "Connexion momentanément indisponible. Dernier état connu affiché."; case .serverUnavailable: return "Le service est momentanément indisponible. Le dernier état connu reste affiché."; default: return userMessage } }
+    var dashboardMessage: String { switch self { case .notConfigured: return "Botaplata ne peut pas encore joindre son serveur depuis cette version de l'application."; case .offline: return "Connexion momentanément indisponible. Dernier état connu affiché."; case .serverUnavailable: return "Serveur indisponible. Dernier état connu affiché."; case .contractIncompatible, .decodingFailed: return "Réponse du serveur incompatible. Dernier état connu affiché."; default: return userMessage } }
 }

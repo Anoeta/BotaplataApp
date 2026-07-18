@@ -18,6 +18,8 @@ struct RemoteRealSessionsRepository: RealSessionsRepository {
         catch APIClientError.httpStatus(401, _) { throw AuthenticationError.accessTokenExpired }
         catch APIClientError.network { throw AuthenticationError.offline }
         catch APIClientError.timeout { throw AuthenticationError.serverUnavailable }
+        catch APIClientError.decoding { throw AuthenticationError.contractIncompatible }
+        catch APIClientError.invalidVersion { throw AuthenticationError.contractIncompatible }
         catch APIClientError.cancelled { throw CancellationError() }
         catch let error as AuthenticationError { throw error }
         catch { throw AuthenticationError.serverUnavailable }
@@ -33,6 +35,8 @@ struct RemoteRealSessionsRepository: RealSessionsRepository {
         catch APIClientError.httpStatus(404, _) { throw AuthenticationError.validationError }
         catch APIClientError.network { throw AuthenticationError.offline }
         catch APIClientError.timeout { throw AuthenticationError.serverUnavailable }
+        catch APIClientError.decoding { throw AuthenticationError.contractIncompatible }
+        catch APIClientError.invalidVersion { throw AuthenticationError.contractIncompatible }
         catch APIClientError.cancelled { throw CancellationError() }
         catch let error as AuthenticationError { throw error }
         catch { throw AuthenticationError.serverUnavailable }
