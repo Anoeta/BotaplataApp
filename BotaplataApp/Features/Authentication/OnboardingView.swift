@@ -2,6 +2,61 @@ import SwiftUI
 
 struct OnboardingView: View {
     let onContinue: () -> Void
-    private let pages = [("Votre robot, en un coup d'œil.", "Suivez l'activité de Botaplata, ses décisions et l'état de vos sessions depuis votre iPhone."), ("Kraken reste côté serveur.", "L'application ne contient aucune clé Kraken et n'envoie jamais d'ordre directement à la plateforme."), ("Comprendre avant d'agir.", "Botaplata vous explique ce qu'il surveille, pourquoi il attend et si les données sont à jour.")]
-    var body: some View { ZStack { BotaplataColors.background.ignoresSafeArea(); TabView { ForEach(Array(pages.enumerated()), id: \.offset) { idx, page in BotaplataCard { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { Text(page.0).font(.title.bold()); Text(page.1).font(.body).foregroundStyle(.secondary); if idx == pages.count - 1 { Button("Continuer", action: onContinue).buttonStyle(.borderedProminent).accessibilityIdentifier("onboarding.continue") } } }.padding().accessibilityElement(children: .combine) } }.tabViewStyle(.page) } }
+
+    private let benefits = [
+        ("Suivi clair des sessions", "chart.line.uptrend.xyaxis"),
+        ("Alertes importantes", BotaplataSymbol.alerts),
+        ("Données sécurisées", BotaplataSymbol.security)
+    ]
+
+    var body: some View {
+        ZStack {
+            PremiumBackground()
+            ScrollView {
+                VStack(alignment: .leading, spacing: BotaplataSpacing.lg) {
+                    AuthHeader(
+                        icon: "sparkles",
+                        eyebrow: "Botaplata iOS",
+                        title: "Botaplata surveille votre bot.",
+                        subtitle: "Suivez vos sessions Kraken, vos positions et vos alertes importantes depuis votre iPhone."
+                    )
+
+                    PremiumCard(variant: .hero) {
+                        VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+                            ForEach(benefits, id: \.0) { benefit in
+                                Label {
+                                    Text(benefit.0)
+                                        .font(BotaplataTypography.cardTitle)
+                                } icon: {
+                                    Image(systemName: benefit.1)
+                                        .foregroundStyle(BotaplataColors.primaryMint)
+                                }
+                            }
+                        }
+                    }
+
+                    VStack(spacing: BotaplataSpacing.sm) {
+                        PremiumPrimaryButton(title: "Commencer", action: onContinue)
+                            .accessibilityIdentifier("onboarding.continue")
+                        PremiumSecondaryButton(title: "J’ai déjà un accès", action: onContinue)
+                            .accessibilityIdentifier("onboarding.existingAccess")
+                    }
+
+                    Text("Compte créé côté serveur. Demandez l’accès à l’administrateur Botaplata.")
+                        .font(BotaplataTypography.caption)
+                        .foregroundStyle(BotaplataColors.textMuted)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(BotaplataSpacing.lg)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, BotaplataSpacing.xl)
+            }
+        }
+    }
+}
+
+#Preview("Onboarding premium") {
+    OnboardingView(onContinue: {})
 }
