@@ -39,17 +39,61 @@ struct JournalEventCard: View { let event: TimelineEvent; let session: SessionSu
 }
 struct EventMetadataRow: View { let title: String; let value: String; var body: some View { HStack { Text(title).foregroundStyle(BotaplataColors.textMuted); Spacer(); Text(value).foregroundStyle(BotaplataColors.textSecondary).monospacedDigit() }.font(.caption) } }
 
-struct OrdersHistoryView: View { let session: SessionDetail; @State var store: RealSessionHistoryStore; var body: some View { PagedHistoryList(title: "Ordres", content: store.orders[session.id] ?? .idle, emptyTitle: "Aucun ordre", emptyMessage: "Aucun ordre n'est disponible pour cette session.", loadNext: { await store.loadNextOrders(sessionID: session.id) }, row: { OrderRow(order: $0) }).task { await store.refreshOrders(sessionID: session.id) }.refreshable { await store.refreshOrders(sessionID: session.id) } } }
-struct DecisionsHistoryView: View { let session: SessionDetail; @State var store: RealSessionHistoryStore; var body: some View { PagedHistoryList(title: "Décisions", content: store.decisions[session.id] ?? .idle, emptyTitle: "Aucune décision", emptyMessage: "Aucune décision n'est disponible pour cette session.", loadNext: { await store.loadNextDecisions(sessionID: session.id) }, row: { DecisionRow(decision: $0) }).task { await store.refreshDecisions(sessionID: session.id) }.refreshable { await store.refreshDecisions(sessionID: session.id) } } }
-struct SessionJournalHistoryView: View { let session: SessionDetail; @State var store: RealSessionHistoryStore; var body: some View { JournalView(session: SessionSummary(id: session.id, pair: session.pair, provider: session.provider, providerLabel: session.providerLabel, backendStatus: session.backendStatus, lifecycle: session.lifecycle, runtimeHealth: session.runtimeHealth, freshness: session.freshness, executionMode: session.executionMode), sessions: [], content: store.timelines[session.id] ?? .idle, warnings: store.warnings[session.id] ?? [], context: .session, loadNext: { await store.loadNextTimeline(sessionID: session.id) }, refresh: { await store.refreshTimeline(sessionID: session.id) }).task { await store.refreshTimeline(sessionID: session.id) } } }
+struct OrdersHistoryView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { PagedHistoryList(title: "Ordres", content: store.orders[session.id] ?? .idle, emptyTitle: "Aucun ordre", emptyMessage: "Aucun ordre n'est disponible pour cette session.", loadNext: { await store.loadNextOrders(sessionID: session.id) }, row: { OrderRow(order: $0) }).task { await store.refreshOrders(sessionID: session.id) }.refreshable { await store.refreshOrders(sessionID: session.id) } } }
+struct DecisionsHistoryView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { PagedHistoryList(title: "Décisions", content: store.decisions[session.id] ?? .idle, emptyTitle: "Aucune décision", emptyMessage: "Aucune décision n'est disponible pour cette session.", loadNext: { await store.loadNextDecisions(sessionID: session.id) }, row: { DecisionRow(decision: $0) }).task { await store.refreshDecisions(sessionID: session.id) }.refreshable { await store.refreshDecisions(sessionID: session.id) } } }
+struct SessionJournalHistoryView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { JournalView(session: SessionSummary(id: session.id, pair: session.pair, provider: session.provider, providerLabel: session.providerLabel, backendStatus: session.backendStatus, lifecycle: session.lifecycle, runtimeHealth: session.runtimeHealth, freshness: session.freshness, executionMode: session.executionMode), sessions: [], content: store.timelines[session.id] ?? .idle, warnings: store.warnings[session.id] ?? [], context: .session, loadNext: { await store.loadNextTimeline(sessionID: session.id) }, refresh: { await store.refreshTimeline(sessionID: session.id) }).task { await store.refreshTimeline(sessionID: session.id) } } }
 
-struct PagedHistoryList<Item: Identifiable & Sendable, Row: View>: View { let title: String; let content: LoadedContent<[Item]>; let emptyTitle: String; let emptyMessage: String; let loadNext: () async -> Void; let row: (Item) -> Row; var body: some View { List { switch content { case .idle, .loading: BotaplataCard { Text("Chargement…") }; case .error: EmptyStateView(title: "Chargement impossible", message: "Vérifiez votre connexion puis réessayez."); case .loaded(let items), .loadedFromCache(let items), .refreshing(let items?), .offline(let items?), .partial(let items), .stale(let items): if items.isEmpty { EmptyStateView(title: emptyTitle, message: emptyMessage) } else { ForEach(items) { item in row(item).task { if item.id == items.last?.id { await loadNext() } } } }; case .refreshing(nil), .offline(nil): EmptyStateView(title: "Chargement impossible", message: "Vérifiez votre connexion puis réessayez.") } }.navigationTitle(title).scrollContentBackground(.hidden).background(BotaplataColors.background).safeAreaPadding(.bottom, BotaplataSpacing.xl) } }
+struct PagedHistoryList<Item: Identifiable & Sendable, Row: View>: View { let title: String; let content: LoadedContent<[Item]>; let emptyTitle: String; let emptyMessage: String; let loadNext: () async -> Void; let row: (Item) -> Row; var body: some View { ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { Text(title).font(BotaplataTypography.sectionTitle).accessibilityAddTraits(.isHeader); switch content { case .idle, .loading: ForEach(0..<3, id: \.self) { _ in PremiumSkeletonCard() }; case .error: PremiumErrorState(title: "Chargement impossible", message: "Vérifiez votre connexion puis réessayez."); case .loaded(let items), .loadedFromCache(let items), .refreshing(let items?), .offline(let items?), .partial(let items), .stale(let items): if items.isEmpty { PremiumEmptyState(title: emptyTitle, message: emptyMessage) } else { ForEach(items) { item in row(item).task { if item.id == items.last?.id { await loadNext() } } }; if case .refreshing = content { ProgressView().frame(maxWidth: .infinity) } }; case .refreshing(nil), .offline(nil): PremiumErrorState(title: "Chargement impossible", message: "Vérifiez votre connexion puis réessayez.") } }.padding().safeAreaPadding(.bottom, BotaplataSpacing.xl) } } }
 struct OrderRow: View { let order: SessionOrder; var body: some View { BotaplataCard { VStack(alignment: .leading, spacing: 8) { HStack { Text(order.side.label).font(.headline); Spacer(); StatusBadge(status: order.status == .filled ? .success : order.status == .rejected ? .danger : .waiting, text: order.statusLabel ?? order.status.label) }; Text(order.orderType?.uppercased() ?? "Type indisponible").font(.caption).foregroundStyle(BotaplataColors.textSecondary); row("Quantité demandée", order.requestedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Quantité exécutée", order.executedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Prix limite", FinancialFormatters.money(order.limitPrice)); row("Prix moyen exécuté", FinancialFormatters.money(order.averageFillPrice)); row("Montant exécuté", FinancialFormatters.money(order.executedQuoteAmount)); row("Frais", FinancialFormatters.money(order.feesQuote)); row("PnL net réalisé", FinancialFormatters.money(order.realizedPnLNetQuote) == "—" ? "Indisponible" : FinancialFormatters.money(order.realizedPnLNetQuote)); Text(HistoryPresentation.fullDate(order.filledAt ?? order.updatedAt ?? order.createdAt ?? Date())).font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } } ; func row(_ k: String, _ v: String) -> some View { PremiumKeyValueRow(label: k, value: v, monospaced: true) } }
 struct DecisionRow: View { let decision: SessionDecision; var body: some View { BotaplataCard { VStack(alignment: .leading, spacing: 8) { Text(HistoryPresentation.fullDate(decision.createdAt)).font(.caption).foregroundStyle(BotaplataColors.textSecondary); Text(decision.summaryTitle).font(.headline); Text(decision.summaryMessage).foregroundStyle(BotaplataColors.textSecondary); if let price = decision.price { Text("Prix : \(FinancialFormatters.money(price))").monospacedDigit() }; DisclosureGroup("Voir le détail de l'analyse") { DetailList(title: "Conditions favorables", items: decision.buyConditions); DetailList(title: "Points à vérifier", items: decision.sellConditions + decision.advice); DetailList(title: "Éléments bloquants", items: decision.blockers); if let s = decision.score { Text("Score technique : \(FinancialFormatters.decimal(s, min: 0, max: 4))").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } } } } }
 struct DetailList: View { let title: String; let items: [String]; var body: some View { if !items.isEmpty { Text(title).font(.subheadline.weight(.semibold)); ForEach(items, id: \.self) { Text("• \($0)").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } } }
 
-struct SessionChartView: View { let session: SessionDetail; @State var store: RealSessionHistoryStore; var body: some View { List { switch store.charts[session.id] ?? .idle { case .idle, .loading: BotaplataCard { Text("Chargement du graphique…") }; case .loaded(let c), .loadedFromCache(let c), .refreshing(let c?), .offline(let c?), .stale(let c): ChartContent(chart: c); case .error: EmptyStateView(title: "Graphique indisponible", message: "Vérifiez votre connexion puis réessayez."); default: EmptyStateView(title: "Graphique indisponible", message: "Vérifiez votre connexion puis réessayez.") } }.navigationTitle("Graphique").scrollContentBackground(.hidden).background(BotaplataColors.background).task { await store.refreshChart(sessionID: session.id) }.refreshable { await store.refreshChart(sessionID: session.id) } } }
-struct ChartContent: View { let chart: SessionChart; var body: some View { Section(chart.displaySymbol) { if chart.points.isEmpty { BotaplataCard { Text("Graphique en préparation").font(.headline); Text("Les niveaux et événements réels sont disponibles, mais la série de prix n’est pas encore fournie.").foregroundStyle(BotaplataColors.textSecondary) } } else { chartView } }; Section("Niveaux financiers") { level("Prix moyen exécuté", chart.levels.executionPrice); level("Prix de revient frais inclus", chart.levels.costBasisPrice); level("Seuil de rentabilité", chart.levels.breakEvenPrice); level("Prix minimum rentable", chart.levels.minimumProfitableExitPrice) }; Section("Transactions confirmées") { ForEach(chart.markers) { m in VStack(alignment: .leading) { Text(m.label.isEmpty ? m.type.label : m.label).font(.headline); Text(HistoryPresentation.fullDate(m.timestamp)).font(.caption).foregroundStyle(BotaplataColors.textSecondary); Text(FinancialFormatters.money(m.price)).monospacedDigit(); if let q = m.quantity { Text("\(FinancialFormatters.decimal(q, min: 2, max: 8)) \(chart.displaySymbol.split(separator: "/").first.map(String.init) ?? "")") } } } } }
+struct SessionChartView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { switch store.charts[session.id] ?? .idle { case .idle, .loading: PremiumSkeletonCard(); case .loaded(let c), .loadedFromCache(let c), .refreshing(let c?), .offline(let c?), .stale(let c): ChartContent(chart: c); case .error: PremiumErrorState(title: "Graphique indisponible", message: "Vérifiez votre connexion puis réessayez."); default: PremiumErrorState(title: "Graphique indisponible", message: "Vérifiez votre connexion puis réessayez.") } }.padding() }.task { await store.refreshChart(sessionID: session.id) }.refreshable { await store.refreshChart(sessionID: session.id) } } }
+struct ChartContent: View {
+    let chart: SessionChart
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+            Text(chart.displaySymbol).font(BotaplataTypography.sectionTitle)
+            if chart.points.isEmpty {
+                PremiumCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Graphique en préparation").font(.headline)
+                        Text("Le serveur ne fournit pas encore la série de prix nécessaire à l’affichage du graphique.").foregroundStyle(BotaplataColors.textSecondary)
+                    }
+                }
+            } else {
+                chartView
+            }
+            PremiumCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Niveaux financiers").font(.headline)
+                    level("Prix moyen exécuté", chart.levels.executionPrice)
+                    level("Prix de revient frais inclus", chart.levels.costBasisPrice)
+                    level("Seuil de rentabilité", chart.levels.breakEvenPrice)
+                    level("Prix minimum rentable", chart.levels.minimumProfitableExitPrice)
+                }
+            }
+            if !chart.markers.isEmpty {
+                PremiumCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Transactions confirmées").font(.headline)
+                        ForEach(chart.markers) { marker in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(marker.label.isEmpty ? marker.type.label : marker.label).font(.headline)
+                                Text(HistoryPresentation.fullDate(marker.timestamp)).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                                Text(FinancialFormatters.money(marker.price)).monospacedDigit()
+                                if let quantity = marker.quantity {
+                                    Text("\(FinancialFormatters.decimal(quantity, min: 2, max: 8)) \(chart.displaySymbol.split(separator: "/").first.map(String.init) ?? "")")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @ViewBuilder var chartView: some View {
         #if canImport(Charts)
         Chart(chart.points) {
@@ -60,6 +104,7 @@ struct ChartContent: View { let chart: SessionChart; var body: some View { Secti
         Text("Courbe disponible sur iOS avec Swift Charts.")
         #endif
     }
+
     func level(_ title: String, _ amount: MoneyAmount?) -> some View { PremiumKeyValueRow(label: title, value: FinancialFormatters.money(amount), monospaced: true) }
 }
 
@@ -71,3 +116,6 @@ enum HistoryPresentation { static func icon(_ e: TimelineEvent) -> String { Jour
 #Preview("Événement ordre filled") { JournalEventCard(event: PreviewFixtures.timelineEvents[1], session: PreviewFixtures.sessionSummaries.first).padding().background(BotaplataColors.background) }
 #Preview("Graphique sans points") { NavigationStack { ChartContent(chart: PreviewFixtures.sessionChart) } }
 #Preview("Ordres") { NavigationStack { PagedHistoryList(title: "Ordres", content: .loaded(PreviewFixtures.sessionOrders), emptyTitle: "Aucun ordre", emptyMessage: "", loadNext: {}, row: { OrderRow(order: $0) }) } }
+#Preview("Transactions") { NavigationStack { PagedHistoryList(title: "Transactions", content: .loaded(PreviewFixtures.sessionOrders), emptyTitle: "Aucun ordre", emptyMessage: "", loadNext: {}, row: { OrderRow(order: $0) }) } }
+#Preview("Décisions historiques") { NavigationStack { PagedHistoryList(title: "Décisions", content: .loaded(PreviewFixtures.sessionDecisions), emptyTitle: "Aucune décision", emptyMessage: "", loadNext: {}, row: { DecisionRow(decision: $0) }) } }
+#Preview("Graphique sans série") { NavigationStack { ChartContent(chart: PreviewFixtures.sessionChart) } }
