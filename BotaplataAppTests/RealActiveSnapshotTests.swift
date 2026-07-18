@@ -27,7 +27,8 @@ final class RealActiveSnapshotTests: XCTestCase {
         XCTAssertEqual(fee.liquidityRole, "unknown")
     }
     func testWaitingBuyFillDoesNotCreatePositionAndReconciliationIsNotRejected() throws {
-        let session = RealActiveSessionDTO(id: "s", name: nil, provider: "kraken", providerLabel: nil, symbol: "SOLUSDC", displaySymbol: "SOL/USDC", status: nil, lifecycleState: "waiting_buy_fill", monitoring: .init(health: "healthy", lastSuccessAt: nil, lastErrorAt: nil, consecutiveErrors: nil), freshness: nil, market: nil, decision: nil, position: nil, activeOrder: .init(id: "o", krakenOrderID: nil, side: "BUY", orderType: "LIMIT", status: "open", requestedQuantity: nil, executedQuantity: nil, limitPrice: nil, averageExecutionPrice: nil, requestedQuoteAmount: nil, executedQuoteAmount: nil, createdAt: nil, updatedAt: nil), reconciliation: nil, feeAware: nil).mapped()
+        let json = #"{"id":"s","provider":"kraken","execution_mode":"real","symbol":"SOLUSDC","display_symbol":"SOL/USDC","status":"active","lifecycle_state":"waiting_buy_fill","monitoring":{"health":"healthy"},"position":null,"active_order":{"id":"o","side":"BUY","order_type":"LIMIT","status":"open"}}"#.data(using: .utf8)!
+        let session = try JSONCoding.decoder.decode(RealSessionDetailDTO.self, from: json).mapped()
         XCTAssertEqual(session.lifecycle, .waitingBuyFill)
         XCTAssertNil(session.position)
         XCTAssertEqual(OrderStatus(backend: "reconciliation_required"), .reconciliationRequired)

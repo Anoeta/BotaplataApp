@@ -1,0 +1,133 @@
+{
+  "ok": true,
+  "version": "mobile_v1",
+  "data": {
+    "generated_at": "2026-07-18T10:00:00Z",
+    "data_source": "real_automation",
+    "execution_mode": "real",
+    "active_session_count": 1,
+    "active_session": {
+      "id": "real-session-002",
+      "name": "SOL real",
+      "provider": "kraken",
+      "provider_label": "Kraken",
+      "execution_mode": "real",
+      "symbol": "SOLUSDC",
+      "display_symbol": "SOL/USDC",
+      "quote_asset": "USDC",
+      "base_asset": "SOL",
+      "status": "active",
+      "lifecycle_state": "position_open",
+      "strategy_key": "star_v3",
+      "strategy_id": "strat-1",
+      "strategy_version": "3",
+      "strategy_display_name": "Star V3",
+      "decision_timeframe": "1m",
+      "risk_timeframe": "5m",
+      "started_at": "2026-07-18T09:00:00Z",
+      "stopped_at": null,
+      "created_at": "2026-07-18T08:59:00Z",
+      "updated_at": "2026-07-18T10:00:00Z",
+      "monitoring": {
+        "health": "healthy",
+        "consecutive_errors": 0
+      },
+      "freshness": {
+        "status": "fresh",
+        "updated_at": "2026-07-18T09:59:55Z",
+        "age_seconds": 5
+      },
+      "market": {
+        "current_price": "79.24",
+        "quote_asset": "USDC",
+        "source": "real_automation",
+        "observed_at": "2026-07-18T09:59:50Z",
+        "updated_at": "2026-07-18T09:59:55Z"
+      },
+      "decision": {
+        "decision": "waiting_buy",
+        "title": "Entr\u00e9e \u00e0 confirmer",
+        "detail": "Les conditions d'achat ne sont pas encore toutes r\u00e9unies.",
+        "score": "3",
+        "score_min": "4",
+        "favorable_conditions": 3,
+        "required_conditions": 4,
+        "controller": "star_v3",
+        "blockers": [
+          "Volume insuffisant"
+        ],
+        "buy_conditions": [
+          {
+            "key": "rsi",
+            "label": "RSI",
+            "state": "ok",
+            "value": "42",
+            "threshold": "< 45",
+            "detail": "RSI favorable"
+          }
+        ],
+        "sell_conditions": [],
+        "advice": [
+          "Attendre confirmation"
+        ],
+        "price": "79.24",
+        "created_at": "2026-07-18T09:59:45Z"
+      },
+      "position": {
+        "id": "pos-1",
+        "status": "open",
+        "side": "long",
+        "symbol": "SOLUSDC",
+        "base_qty": "12.5",
+        "entry_price": "78.80",
+        "average_execution_price": "78.90",
+        "cost_basis_price": "79.04",
+        "current_price": "80.10",
+        "estimated_value_quote": "1001.25",
+        "unrealized_pnl_quote": "15.00",
+        "opened_at": "2026-07-18T09:30:00Z",
+        "origin": "kraken",
+        "reconciliation_pending": false
+      },
+      "active_order": null,
+      "reconciliation": null,
+      "fee_aware": {
+        "execution_price": "78.90",
+        "cost_basis_price": "79.04",
+        "buy_fee_quote": "1.75",
+        "buy_fee_rate_effective": "0.0025",
+        "buy_fee_asset": "USDC",
+        "estimated_sell_fee_quote": "1.80",
+        "estimated_sell_fee_rate": "0.0025",
+        "estimated_sell_fee_source": "kraken",
+        "liquidity_role": "maker",
+        "liquidity_role_label": "Maker",
+        "break_even_price": "79.18",
+        "minimum_profitable_exit_price": "79.50",
+        "minimum_net_profit_rate": "0.005",
+        "estimated_slippage_rate": "0.001",
+        "gross_current_value_quote": "1001.25",
+        "unrealized_pnl_gross_quote": "15.00",
+        "unrealized_pnl_net_estimated_quote": "13.20",
+        "total_cycle_fees_estimated_quote": "3.55"
+      },
+      "pnl": {
+        "realized_pnl_quote": null,
+        "realized_pnl_net_quote": null,
+        "unrealized_pnl_quote": "15.00",
+        "unrealized_pnl_net_estimated_quote": "13.20"
+      }
+    }
+  },
+  "error": null,
+  "meta": {
+    "request_id": "req-contract",
+    "server_time": "2026-07-18T10:00:00Z"
+  },
+  "warnings": [
+    {
+      "code": "monitoring_degraded",
+      "message": "La surveillance de cette session rencontre actuellement un probl\u00e8me."
+    }
+  ]
+}

@@ -4,6 +4,7 @@ enum AuthenticationError: Error, Equatable, Sendable {
     case invalidCredentials, twoFactorNotConfigured, invalidTwoFactorCode, challengeExpired, tooManyAttempts
     case accessTokenExpired, refreshRevoked, refreshReuseDetected, deviceRevoked, userDisabled, deviceLimitReached
     case permissionDenied, validationError, serverUnavailable, offline, rateLimited, maintenance
+    case decodingFailed, contractIncompatible
     case notConfigured, unknown
 
     var userMessage: String {
@@ -19,8 +20,9 @@ enum AuthenticationError: Error, Equatable, Sendable {
         case .deviceRevoked: "Cet iPhone n'est plus autorisé à accéder à Botaplata."
         case .userDisabled: "Ce compte n’est plus autorisé à accéder à Botaplata."
         case .deviceLimitReached: "Le nombre maximal d’appareils autorisés est atteint."
-        case .serverUnavailable: "Le service est momentanément indisponible."
-        case .offline: "Connexion indisponible. Mode hors ligne limité."
+        case .serverUnavailable: "Serveur indisponible\n\nBotaplata ne peut pas répondre pour le moment."
+        case .decodingFailed, .contractIncompatible: "Réponse du serveur incompatible\n\nL’application n’a pas pu lire certaines données Botaplata. Vérifiez que le serveur et l’application sont à jour."
+        case .offline: "Connexion indisponible\n\nL’iPhone ne parvient pas à joindre le serveur Botaplata."
         case .rateLimited: "Trop de tentatives ont été effectuées. Réessayez plus tard."
         case .maintenance: "Botaplata est en maintenance."
         case .notConfigured: "L'authentification serveur n'est pas encore configurée."
@@ -86,6 +88,7 @@ extension AuthenticationError {
         case "SERVER_UNAVAILABLE": self = .serverUnavailable
         case "MAINTENANCE": self = .maintenance
         case "VALIDATION_ERROR": self = .validationError
+        case "CONTRACT_INCOMPATIBLE": self = .contractIncompatible
         default: self = .unknown
         }
     }

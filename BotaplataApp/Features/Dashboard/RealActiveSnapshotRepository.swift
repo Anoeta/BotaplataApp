@@ -14,6 +14,8 @@ struct RemoteRealActiveSnapshotRepository: RealActiveSnapshotRepository {
         catch APIClientError.httpStatus(401, _) { throw AuthenticationError.accessTokenExpired }
         catch APIClientError.network { throw AuthenticationError.offline }
         catch APIClientError.timeout { throw AuthenticationError.serverUnavailable }
+        catch APIClientError.decoding { throw AuthenticationError.contractIncompatible }
+        catch APIClientError.invalidVersion { throw AuthenticationError.contractIncompatible }
         catch APIClientError.cancelled { throw CancellationError() }
         catch let error as AuthenticationError { throw error }
         catch { throw AuthenticationError.serverUnavailable }
