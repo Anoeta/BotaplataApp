@@ -24,7 +24,7 @@ struct DashboardView: View {
         ZStack {
             PremiumBackground()
             ScrollView {
-                VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+                LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
                     header
                     bodyContent
                 }
@@ -93,7 +93,7 @@ struct DashboardView: View {
     }
 
     private func snapshotView(_ snapshot: RealActiveSnapshot, cached: Bool, offline: Bool) -> some View {
-        VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+        LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
             if offline { PremiumOfflineBanner() }
             if cached && !offline { WarningBanner(warning: Warning(id: "cache", severity: .information, title: "Dernier état connu affiché", message: "Les données proviennent du cache local pendant l'actualisation.")) }
             ForEach(snapshot.warnings) { WarningBanner(warning: $0) }
@@ -101,11 +101,14 @@ struct DashboardView: View {
             if unreadCount > 0 { DashboardAlertCard(unreadCount: unreadCount, openAlerts: openAlerts) }
             if let session = snapshot.activeSession {
                 DashboardSessionCard(session: session, activeSessionCount: snapshot.activeSessionCount, openSession: openSession)
-                DashboardDecisionCard(session: session)
-                if DashboardPresentation.shouldShowPosition(session.position) { DashboardPositionCard(session: session) }
-                if let order = session.activeOrder { DashboardOrderCard(order: order) }
-                DashboardMarketAnalysisCard(session: session, openSession: openSession)
-                DashboardHealthCard(session: session, cached: cached || offline)
+                DecisionSummaryCard(session: session)
+                StrategyConditionsCard(decision: session.decision)
+                PositionCard(session: session)
+                ReconciliationCard(session: session)
+                if let order = session.activeOrder { ActiveOrderCard(order: order) }
+                SessionFinancialSummaryCard(session: session)
+                FeeAwareCard(fee: session.feeAware, compact: true)
+                HealthFreshnessCard(session: session, cached: cached || offline)
                 DashboardRefreshFooter(snapshot: snapshot, session: session, cached: cached || offline)
             } else {
                 PremiumEmptyState(title: "Aucune session active", message: "Les sessions Kraken disponibles apparaîtront ici.", systemImage: "tray")
@@ -152,7 +155,8 @@ private struct DashboardSessionCard: View {
                     Text(session.pair).font(.title2.bold().monospacedDigit()).foregroundStyle(BotaplataColors.textPrimary)
                     row("Plateforme", session.provider.displayName)
                     row("Stratégie", session.strategyName ?? "Indisponible")
-                    row("Analyse", "Dernière décision backend")
+                    row("Analyse", RealSessionUIPresentation.analysisText(session))
+                    row("Mode", RealSessionUIPresentation.executionModeText(session.executionMode))
                     if let count = activeSessionCount, count > 1 { Text("Plusieurs sessions actives signalées par le backend.").font(.caption).foregroundStyle(BotaplataColors.warning) }
                 }
             }
@@ -220,3 +224,9 @@ extension DashboardPresentation {
 #Preview("Dashboard offline avec cache") { NavigationStack { DashboardView(content: .offline(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.krakenDetail, warnings: [], requestID: nil, serverTime: nil)), unreadCount: 3) } }
 #Preview("Dashboard aucune session") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 0, activeSession: nil, warnings: [], requestID: nil, serverTime: nil)), unreadCount: 0) } }
 #Preview("Dashboard loading") { NavigationStack { DashboardView(content: .loading) } }
+#Preview("Dashboard waiting buy") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuy, warnings: [], requestID: nil, serverTime: nil))) } }
+#Preview("Dashboard décision 3 sur 4") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuyWithConditions, warnings: [], requestID: nil, serverTime: nil))) } }
+#Preview("Dashboard position ouverte") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.krakenDetail, warnings: [], requestID: nil, serverTime: nil))) } }
+#Preview("Dashboard ordre pending") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuyFill, warnings: [], requestID: nil, serverTime: nil))) } }
+#Preview("Dashboard réconciliation") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.reconciliationDetail, warnings: [], requestID: nil, serverTime: nil))) } }
+#Preview("Dashboard données anciennes") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.staleDetail, warnings: PreviewFixtures.staleDetail.warnings, requestID: nil, serverTime: nil))) } }

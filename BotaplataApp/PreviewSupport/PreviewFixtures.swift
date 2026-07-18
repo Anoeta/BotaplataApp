@@ -56,3 +56,23 @@ extension PreviewFixtures {
         PushPreferenceItem(eventType: "real_protection_triggered", enabled: true, mandatory: true, severity: .critical)
     ], updatedAt: now)
 }
+
+extension PreviewFixtures {
+    static var waitingBuyWithConditions: SessionDetail {
+        var decision = waitingBuy.decision
+        decision.score = 3
+        decision.scoreMin = 4
+        decision.buyConditions = [
+            StrategyConditionSummary(key: "rsi", label: "RSI", state: "waiting", value: nil, threshold: nil, detail: nil),
+            StrategyConditionSummary(key: "bollinger", label: "Bollinger", state: "validated", value: nil, threshold: nil, detail: nil),
+            StrategyConditionSummary(key: "vwap", label: "VWAP", state: "ok", value: nil, threshold: nil, detail: nil),
+            StrategyConditionSummary(key: "adx", label: "ADX", state: "pending", value: nil, threshold: nil, detail: "Compatible, à confirmer")
+        ]
+        decision.blockers = ["Le score minimum n’est pas encore atteint."]
+        return SessionDetail(id: waitingBuy.id, pair: waitingBuy.pair, provider: waitingBuy.provider, providerLabel: waitingBuy.providerLabel, backendStatus: waitingBuy.backendStatus, lifecycle: waitingBuy.lifecycle, runtimeHealth: waitingBuy.runtimeHealth, monitoringConsecutiveErrors: waitingBuy.monitoringConsecutiveErrors, freshness: waitingBuy.freshness, executionMode: waitingBuy.executionMode, startedAt: waitingBuy.startedAt, stoppedAt: waitingBuy.stoppedAt, strategyName: waitingBuy.strategyName, currentPrice: waitingBuy.currentPrice, position: waitingBuy.position, decision: decision, activeOrder: waitingBuy.activeOrder, reconciliation: waitingBuy.reconciliation, pnl: waitingBuy.pnl, feeAware: waitingBuy.feeAware, warnings: waitingBuy.warnings)
+    }
+
+    static var reconciliationDetail: SessionDetail {
+        SessionDetail(id: waitingBuyFill.id, pair: waitingBuyFill.pair, provider: waitingBuyFill.provider, lifecycle: .reconciliationPending, runtimeHealth: .healthy, freshness: fresh, currentPrice: waitingBuyFill.currentPrice, position: nil, decision: waitingBuyFill.decision, activeOrder: TradingOrderSummary(id: "KRAKEN_ORDER_SENTINEL", side: "BUY", status: .reconciliationRequired, message: "Botaplata vérifie encore l’état de cet ordre sur Kraken.", requestedQuantity: 1.25, executedQuantity: 0, limitPrice: .init(74.68), averageExecutionPrice: nil, createdAt: now.addingTimeInterval(-600), updatedAt: now.addingTimeInterval(-60)), reconciliation: Warning(id: "reconciliation", severity: .warning, title: "Vérification nécessaire", message: "Botaplata vérifie encore l’état de cet ordre sur Kraken."), pnl: nil, feeAware: feePartial, warnings: [])
+    }
+}
