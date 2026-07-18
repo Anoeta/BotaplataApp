@@ -15,7 +15,7 @@ struct SessionsContainerView: View {
         .task { store.start() }
         .navigationDestination(for: SessionRoute.self) { route in
             switch route {
-            case .detail(let id, let section):
+            case let .detail(id, section):
                 SessionDetailContainerView(
                     sessionID: id,
                     initialSection: section,
@@ -28,9 +28,19 @@ struct SessionsContainerView: View {
     }
 }
 
-enum SessionListFilter: String, CaseIterable, Identifiable { case all, active, history, watch
+enum SessionListFilter: String, CaseIterable, Identifiable {
+    case all, active, history, watch
+
     var id: String { rawValue }
-    var title: String { switch self { case .all: "Toutes"; case .active: "En cours"; case .history: "Historique"; case .watch: "À surveiller" } }
+
+    var title: String {
+        switch self {
+        case .all: "Toutes"
+        case .active: "En cours"
+        case .history: "Historique"
+        case .watch: "À surveiller"
+        }
+    }
 }
 
 enum SessionsPresentation {
@@ -49,7 +59,12 @@ enum SessionsPresentation {
     }
 
     static func shouldWatch(_ session: SessionSummary) -> Bool {
-        session.runtimeHealth == .degraded || session.runtimeHealth == .unavailable || session.freshness.status == .stale || session.lifecycle == .reconciliationPending || session.backendStatus == "safety_blocked" || session.backendStatus == "error"
+        session.runtimeHealth == .degraded ||
+            session.runtimeHealth == .unavailable ||
+            session.freshness.status == .stale ||
+            session.lifecycle == .reconciliationPending ||
+            session.backendStatus == "safety_blocked" ||
+            session.backendStatus == "error"
     }
 
     static func lifecycleTitle(_ lifecycle: SessionLifecycleState) -> String {
@@ -82,11 +97,30 @@ enum SessionsPresentation {
     }
 
     static func searchableText(_ session: SessionSummary) -> String {
-        [session.pair, session.provider.displayName, session.providerLabel, session.strategyName, session.backendStatus].compactMap { $0 }.joined(separator: " ").lowercased()
+        [session.pair, session.provider.displayName, session.providerLabel, session.strategyName, session.backendStatus]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .lowercased()
     }
 
     static func shouldShowPosition(_ position: OpenPosition?) -> Bool { (position?.quantity ?? 0) > 0 }
-    static func activeOrderStatusText(_ status: OrderStatus) -> String { switch status { case .submitted: "Envoyé à Kraken"; case .open: "En attente sur Kraken"; case .partiallyFilled: "Partiellement exécuté"; case .filled: "Confirmé par Kraken"; case .reconciliationRequired: "Vérification en cours"; case .reconciliationBlocked: "Vérification bloquée"; case .reconciliationFailed: "Vérification échouée"; case .rejected: "Refusé"; case .canceled: "Annulé"; case .unknown: "Préparation" } }
+
+    static func activeOrderStatusText(_ status: OrderStatus) -> String {
+        switch status {
+        case .submissionStarted: "Préparation de l’ordre"
+        case .submitted: "Envoyé à Kraken"
+        case .open: "En attente sur Kraken"
+        case .partiallyFilled: "Partiellement exécuté"
+        case .filled: "Confirmé par Kraken"
+        case .reconciliationRequired: "Vérification en cours"
+        case .reconciliationBlocked: "Vérification bloquée"
+        case .reconciliationFailed: "Vérification échouée"
+        case .rejected: "Refusé"
+        case .canceled: "Annulé"
+        case .unknown: "Préparation"
+        }
+    }
+
     static func feeAwareRows(_ fee: FeeAwareSummary) -> [(String, String)] {
         [
             ("Prix de revient frais inclus", moneyIfPresent(fee.costBasisPrice)),
@@ -100,60 +134,400 @@ enum SessionsPresentation {
             ("Frais totaux estimés", moneyIfPresent(fee.totalEstimatedCycleFeesQuote))
         ].compactMap { label, value in value.map { (label, $0) } }
     }
-    private static func moneyIfPresent(_ amount: MoneyAmount?) -> String? { amount?.value == nil ? nil : FinancialFormatters.money(amount) }
+
+    private static func moneyIfPresent(_ amount: MoneyAmount?) -> String? {
+        amount?.value == nil ? nil : FinancialFormatters.money(amount)
+    }
 }
 
 struct SessionsView: View {
-    let content: LoadedContent<[SessionSummary]>; var warnings: [Warning] = []; var loadNext: (String?) async -> Void = { _ in }; var refresh: () async -> Void = {}; var historyStore: RealSessionHistoryStore? = nil
+    let content: LoadedContent<[SessionSummary]>
+    var warnings: [Warning] = []
+    var loadNext: (String?) async -> Void = { _ in }
+    var refresh: () async -> Void = {}
+    var historyStore: RealSessionHistoryStore? = nil
+
     @State private var selectedFilter: SessionListFilter = .all
     @State private var searchText = ""
 
-    var body: some View {
-        ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { header; banners; contentView }.padding().safeAreaPadding(.bottom, BotaplataSpacing.xl) } }
-            .navigationTitle("Sessions")
-            .searchable(text: $searchText, prompt: "Paire, provider, stratégie")
-            .refreshable { await refresh() }
+    private var isOffline: Bool {
+        if case .offline = content { return true }
+        return false
     }
-    var header: some View { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { Text("Sessions").font(BotaplataTypography.largeTitle).foregroundStyle(BotaplataColors.textPrimary); ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(SessionListFilter.allCases) { filter in Button { selectedFilter = filter } label: { FilterPill(title: filter.title, isSelected: selectedFilter == filter) }.accessibilityLabel("Filtre \(filter.title)").accessibilityAddTraits(selectedFilter == filter ? .isSelected : []) } } } } }
-    @ViewBuilder var banners: some View { if isOffline { PremiumOfflineBanner() }; ForEach(warnings) { WarningBanner(warning: $0) } }
-    @ViewBuilder var contentView: some View { switch content { case .idle, .loading: ForEach(0..<3, id: \.self) { _ in PremiumSkeletonCard() }; case .error: PremiumErrorState(title: "Impossible de charger les sessions", message: "Vérifiez votre connexion puis réessayez."); case .loaded(let items), .loadedFromCache(let items), .refreshing(let items?), .offline(let items?), .partial(let items), .stale(let items): let filtered = SessionsPresentation.filtered(items, filter: selectedFilter, query: searchText); if filtered.isEmpty { PremiumEmptyState(title: "Aucune session réelle", message: "Les sessions Kraken disponibles apparaîtront ici.") } else { sessionSections(filtered) }; case .refreshing(nil), .offline(nil): PremiumErrorState(title: "Impossible de charger les sessions", message: "Vérifiez votre connexion puis réessayez.") } }
-    var isOffline: Bool { if case .offline = content { true } else { false } }
-    func sessionSections(_ items: [SessionSummary]) -> some View { Group { let active = items.filter { !$0.isHistorical }; let history = items.filter(\.isHistorical); if !active.isEmpty { SectionHeader(title: "Sessions en cours", subtitle: nil); rows(active) }; if !history.isEmpty { SectionHeader(title: "Historique", subtitle: nil); rows(history) } } }
-    func rows(_ items: [SessionSummary]) -> some View { ForEach(items) { session in NavigationLink(value: SessionRoute.detail(id: session.id, section: .overview)) { PremiumSessionCard(session: session).task { await loadNext(session.id) } }.buttonStyle(.plain).accessibilityAddTraits(.isButton).accessibilityLabel(accessibility(for: session)) } }
-    func accessibility(for s: SessionSummary) -> String { let pnl = SessionsPresentation.pnlLine(s).map { "\($0.label) \(FinancialFormatters.money($0.value))" } ?? "résultat indisponible"; return "\(s.pair.replacingOccurrences(of: "/", with: " ")), \(SessionsPresentation.statusText(s)), \(SessionsPresentation.lifecycleTitle(s.lifecycle)), \(pnl), \(freshnessText(s.freshness))." }
+
+    private var visibleItems: [SessionSummary]? {
+        switch content {
+        case let .loaded(items), let .loadedFromCache(items), let .refreshing(.some(items)), let .offline(.some(items)), let .partial(items), let .stale(items):
+            return items
+        case .idle, .loading, .error, .refreshing(nil), .offline(nil):
+            return nil
+        }
+    }
+
+    private var filteredItems: [SessionSummary] {
+        SessionsPresentation.filtered(visibleItems ?? [], filter: selectedFilter, query: searchText)
+    }
+
+    private var activeItems: [SessionSummary] { filteredItems.filter { !$0.isHistorical } }
+    private var historicalItems: [SessionSummary] { filteredItems.filter(\.isHistorical) }
+
+    var body: some View {
+        ZStack {
+            PremiumBackground()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+                    header
+                    banners
+                    contentView
+                }
+                .padding()
+                .safeAreaPadding(.bottom, BotaplataSpacing.xl)
+            }
+        }
+        .navigationTitle("Sessions")
+        .searchable(text: $searchText, prompt: "Paire, provider, stratégie")
+        .refreshable { await refresh() }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+            Text("Sessions")
+                .font(BotaplataTypography.largeTitle)
+                .foregroundStyle(BotaplataColors.textPrimary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack {
+                    ForEach(SessionListFilter.allCases) { filter in
+                        Button { selectedFilter = filter } label: {
+                            FilterPill(title: filter.title, isSelected: selectedFilter == filter)
+                        }
+                        .accessibilityLabel("Filtre \(filter.title)")
+                        .accessibilityAddTraits(selectedFilter == filter ? .isSelected : [])
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var banners: some View {
+        if isOffline { PremiumOfflineBanner() }
+        ForEach(warnings) { WarningBanner(warning: $0) }
+    }
+
+    @ViewBuilder private var contentView: some View {
+        switch content {
+        case .idle, .loading:
+            loadingView
+        case .error:
+            PremiumErrorState(title: "Impossible de charger les sessions", message: "Vérifiez votre connexion puis réessayez.")
+        case .loaded, .loadedFromCache, .refreshing(.some), .offline(.some), .partial, .stale:
+            loadedView
+        case .refreshing(nil), .offline(nil):
+            PremiumErrorState(title: "Impossible de charger les sessions", message: "Vérifiez votre connexion puis réessayez.")
+        }
+    }
+
+    private var loadingView: some View {
+        ForEach(0..<3, id: \.self) { _ in PremiumSkeletonCard() }
+    }
+
+    @ViewBuilder private var loadedView: some View {
+        if filteredItems.isEmpty {
+            PremiumEmptyState(title: "Aucune session réelle", message: "Les sessions Kraken disponibles apparaîtront ici.")
+        } else {
+            sessionSections
+        }
+    }
+
+    @ViewBuilder private var sessionSections: some View {
+        if !activeItems.isEmpty {
+            SectionHeader(title: "Sessions en cours", subtitle: nil)
+            rows(activeItems)
+        }
+        if !historicalItems.isEmpty {
+            SectionHeader(title: "Historique", subtitle: nil)
+            rows(historicalItems)
+        }
+    }
+
+    private func rows(_ items: [SessionSummary]) -> some View {
+        ForEach(items) { session in
+            NavigationLink(value: SessionRoute.detail(id: session.id, section: .overview)) {
+                PremiumSessionCard(session: session)
+                    .task { await loadNext(session.id) }
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(accessibilityLabel(for: session))
+        }
+    }
+
+    private func accessibilityLabel(for session: SessionSummary) -> String {
+        let pair = session.pair.replacingOccurrences(of: "/", with: " ")
+        let pnl = SessionsPresentation.pnlLine(session).map { line in
+            "\(line.label) \(FinancialFormatters.money(line.value))"
+        } ?? "résultat indisponible"
+        let freshness = SessionFreshnessPresentation.text(for: session.freshness)
+        return "\(pair), \(SessionsPresentation.statusText(session)), \(SessionsPresentation.lifecycleTitle(session.lifecycle)), \(pnl), \(freshness)."
+    }
 }
 
-struct PremiumSessionCard: View { let session: SessionSummary
-    var body: some View { PremiumCard(variant: SessionsPresentation.shouldWatch(session) ? .warning : .normal) { VStack(alignment: .leading, spacing: 12) { HStack(alignment: .top) { VStack(alignment: .leading, spacing: 4) { Text(session.pair).font(BotaplataTypography.cardTitle); Text([session.strategyName, session.providerLabel ?? session.provider.displayName].compactMap { $0 }.joined(separator: " · ")).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary) }; Spacer(); StatusPill(status: SessionsPresentation.status(session), text: SessionsPresentation.statusText(session)) }; Text(SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.headline); Text(session.lifecycle.userMessage).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary).lineLimit(2); HStack { if let line = SessionsPresentation.pnlLine(session) { VStack(alignment: .leading) { Text(line.label).font(.caption).foregroundStyle(BotaplataColors.textMuted); Text(line.value == nil ? "Indisponible" : FinancialFormatters.money(line.value)).font(BotaplataTypography.monoValue).foregroundStyle(BotaplataColors.textPrimary).monospacedDigit() } }; Spacer(); FreshnessBadge(freshness: session.freshness) }; Text(freshnessText(session.freshness)).font(.caption).foregroundStyle(BotaplataColors.textMuted) } } }
+struct PremiumSessionCard: View {
+    let session: SessionSummary
+
+    private var subtitle: String {
+        [session.strategyName, session.providerLabel ?? session.provider.displayName]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+    }
+
+    private var formattedPnL: String {
+        guard let line = SessionsPresentation.pnlLine(session) else { return "Indisponible" }
+        return line.value == nil ? "Indisponible" : FinancialFormatters.money(line.value)
+    }
+
+    private var pnlLabel: String? { SessionsPresentation.pnlLine(session)?.label }
+    private var freshnessText: String { SessionFreshnessPresentation.text(for: session.freshness) }
+
+    var body: some View {
+        PremiumCard(variant: SessionsPresentation.shouldWatch(session) ? .warning : .normal) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(session.pair).font(BotaplataTypography.cardTitle)
+                        Text(subtitle).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary)
+                    }
+                    Spacer()
+                    StatusPill(status: SessionsPresentation.status(session), text: SessionsPresentation.statusText(session))
+                }
+                Text(SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.headline)
+                Text(session.lifecycle.userMessage).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary).lineLimit(2)
+                HStack {
+                    if let pnlLabel {
+                        VStack(alignment: .leading) {
+                            Text(pnlLabel).font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                            Text(formattedPnL).font(BotaplataTypography.monoValue).foregroundStyle(BotaplataColors.textPrimary).monospacedDigit()
+                        }
+                    }
+                    Spacer()
+                    FreshnessBadge(freshness: session.freshness)
+                }
+                Text(freshnessText).font(.caption).foregroundStyle(BotaplataColors.textMuted)
+            }
+        }
+    }
 }
 
-struct SessionDetailContainerView: View { let sessionID: String; let initialSection: NotificationNavigationTarget.Section; let content: LoadedContent<SessionDetail>; let load: () async -> Void; let historyStore: RealSessionHistoryStore?; @State private var selectedSection: NotificationNavigationTarget.Section
-    init(sessionID: String, initialSection: NotificationNavigationTarget.Section, content: LoadedContent<SessionDetail>, load: @escaping () async -> Void, historyStore: RealSessionHistoryStore?) { self.sessionID = sessionID; self.initialSection = initialSection; self.content = content; self.load = load; self.historyStore = historyStore; _selectedSection = State(initialValue: initialSection) }
-    var body: some View { ZStack { PremiumBackground(); Group { switch content { case .loaded(let s), .refreshing(let s?), .offline(let s?), .stale(let s), .loadedFromCache(let s): SessionDetailContent(session: s, selectedSection: $selectedSection, compact: false, historyStore: historyStore, isOffline: isOffline); case .error: PremiumErrorState(title: "Impossible de charger la session", message: "Vérifiez la connexion au serveur Botaplata.").padding(); default: VStack(spacing: BotaplataSpacing.md) { PremiumSkeletonCard(); PremiumSkeletonCard(); PremiumSkeletonCard() }.padding() } } }.navigationTitle("Détail").task(id: sessionID) { await load() } }
-    var isOffline: Bool { if case .offline = content { true } else { false } }
-}
-struct SessionDetailView: View { let session: SessionDetail; @State private var selectedSection: NotificationNavigationTarget.Section = .overview; var body: some View { ZStack { PremiumBackground(); SessionDetailContent(session: session, selectedSection: $selectedSection, compact: false, historyStore: nil, isOffline: false) }.navigationTitle(session.pair) } }
-struct SessionDetailContent: View { let session: SessionDetail; @Binding var selectedSection: NotificationNavigationTarget.Section; let compact: Bool; let historyStore: RealSessionHistoryStore?; let isOffline: Bool
-    var body: some View { VStack(spacing: 0) { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { detailHeader; sectionSelector }.padding([.horizontal, .top]); sectionContent }.safeAreaPadding(.bottom, BotaplataSpacing.xl) }
-    var detailHeader: some View { PremiumCard(variant: .hero) { VStack(alignment: .leading, spacing: 10) { HStack { VStack(alignment: .leading) { Text(session.pair).font(BotaplataTypography.largeTitle); Text([session.providerLabel ?? session.provider.displayName, session.strategyName].compactMap { $0 }.joined(separator: " · ")).foregroundStyle(BotaplataColors.textSecondary) }; Spacer(); StatusPill(status: session.lifecycle == .stopped ? .neutral : .active, text: session.lifecycle == .stopped ? "Terminée" : "LIVE") }; HStack { StatusPill(status: .waiting, text: SessionsPresentation.lifecycleTitle(session.lifecycle)); FreshnessBadge(freshness: session.freshness) }; Text(session.lifecycle.userMessage).foregroundStyle(BotaplataColors.textSecondary); Text(freshnessText(session.freshness)).font(.caption).foregroundStyle(BotaplataColors.textMuted) } } }
-    var sectionSelector: some View { ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(NotificationNavigationTarget.Section.allCases, id: \.self) { section in Button { selectedSection = section } label: { FilterPill(title: section.title, isSelected: selectedSection == section) }.buttonStyle(.plain).accessibilityLabel("Section \(section.title)" + (selectedSection == section ? ", sélectionnée" : "")) } } } }
-    @ViewBuilder var sectionContent: some View { switch selectedSection { case .overview: overview; case .journal: if let historyStore { SessionJournalHistoryView(session: session, store: historyStore) } else { PremiumEmptyState(title: "Journal indisponible", message: "Aucune source locale n'est attachée à cette preview.") }; case .orders: if let historyStore { OrdersHistoryView(session: session, store: historyStore) } else { PremiumEmptyState(title: "Ordres indisponibles", message: "Aucune source locale n'est attachée à cette preview.") }; case .decisions: if let historyStore { DecisionsHistoryView(session: session, store: historyStore) } else { PremiumEmptyState(title: "Décisions indisponibles", message: "Aucune source locale n'est attachée à cette preview.") }; case .chart: if let historyStore { SessionChartView(session: session, store: historyStore) } else { ChartContent(chart: PreviewFixtures.sessionChart) } } }
-    var overview: some View { ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { if isOffline { PremiumOfflineBanner() }; ForEach(session.warnings) { WarningBanner(warning: $0) }; ReconciliationCard(session: session); stateCard; marketCard; DecisionSummaryCard(session: session, detailed: true); StrategyConditionsCard(decision: session.decision); PositionCard(session: session); if let order = session.activeOrder { ActiveOrderCard(order: order) }; SessionFinancialSummaryCard(session: session); FeeAwareCard(fee: session.feeAware); HealthFreshnessCard(session: session, cached: isOffline) }.padding() } }
-    var stateCard: some View { PremiumCard { VStack(alignment:.leading, spacing: 10) { Text("État actuel").font(BotaplataTypography.cardTitle); Text(SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.headline); Text(session.lifecycle.userMessage).foregroundStyle(BotaplataColors.textSecondary); StatusPill(status: session.runtimeHealth == .healthy ? .success : .warning, text: session.runtimeHealth.label); FreshnessBadge(freshness: session.freshness); if let errors = session.monitoringConsecutiveErrors, errors > 0 { Text("\(errors) erreurs consécutives").foregroundStyle(BotaplataColors.warning) } } } }
-    var marketCard: some View { PremiumCard { VStack(alignment: .leading, spacing: 8) { Text("Marché").font(BotaplataTypography.cardTitle); row("Prix actuel", FinancialFormatters.money(session.currentPrice)) } } }
-    var positionCard: some View { PremiumCard { VStack(alignment:.leading, spacing: 8) { Text("Position").font(BotaplataTypography.cardTitle); if SessionsPresentation.shouldShowPosition(session.position), let p = session.position { Text("Position ouverte").font(.headline); row("Quantité", p.quantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Prix moyen exécuté", FinancialFormatters.money(p.averageExecutionPrice)); row("Prix de revient frais inclus", FinancialFormatters.money(p.costBasisPrice)); row("Prix actuel", FinancialFormatters.money(session.currentPrice)); row("Résultat brut", FinancialFormatters.money(session.pnl?.gross)); row("Résultat net estimé", FinancialFormatters.money(session.pnl?.netEstimated)); Text("Le résultat net estimé tient compte des frais d'achat réels, des frais de vente estimés et du slippage estimé.").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } else { Text("Aucune position ouverte").font(.headline); Text("Botaplata cherche encore une opportunité.").foregroundStyle(BotaplataColors.textSecondary) } } } }
-    var decisionCard: some View { PremiumCard { VStack(alignment:.leading, spacing: 8) { Text("Décision actuelle").font(BotaplataTypography.cardTitle); Text(session.decision.title).font(.headline); Text(session.decision.detail).foregroundStyle(BotaplataColors.textSecondary); if let f = session.decision.favorableConditions, let r = session.decision.requiredConditions { Text("\(f) conditions favorables sur \(r)").monospacedDigit() } } } }
-    func activeOrderCard(_ order: TradingOrderSummary) -> some View { PremiumCard { VStack(alignment:.leading, spacing: 8) { Text("Ordre actif").font(BotaplataTypography.cardTitle); Text(order.side.uppercased()).font(.headline); StatusPill(status: order.status == .filled ? .success : order.status == .rejected ? .danger : .waiting, text: SessionsPresentation.activeOrderStatusText(order.status)); row("Quantité demandée", order.requestedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Quantité exécutée", order.executedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Prix limite", FinancialFormatters.money(order.limitPrice)); row("Prix moyen exécuté", FinancialFormatters.money(order.averageExecutionPrice)); Text(order.message).font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } }
-    var feeAwareCard: some View { PremiumCard { VStack(alignment:.leading, spacing: 8) { Text("Frais / rentabilité").font(BotaplataTypography.cardTitle); ForEach(SessionsPresentation.feeAwareRows(session.feeAware), id: \.0) { row($0.0, $0.1) }; Text("Ces estimations proviennent du backend Botaplata.").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } }
-    var healthCard: some View { PremiumCard { VStack(alignment:.leading, spacing: 8) { Text("Santé et fraîcheur").font(BotaplataTypography.cardTitle); row("Surveillance", session.runtimeHealth.label); row("Fraîcheur", freshnessText(session.freshness)); row("Mode", session.executionMode.rawValue) } } }
-    var pnlCard: some View { PremiumCard { VStack(alignment:.leading, spacing: 8) { Text("Données financières").font(BotaplataTypography.cardTitle); row("Résultat latent", FinancialFormatters.money(session.pnl?.gross)); row("Résultat net estimé", FinancialFormatters.money(session.pnl?.netEstimated)); row("Résultat net réalisé", FinancialFormatters.money(session.pnl?.realizedNet)) } } }
-    func row(_ k: String, _ v: String) -> some View { PremiumKeyValueRow(label: k, value: v, monospaced: true) }
+struct SessionDetailContainerView: View {
+    let sessionID: String
+    let initialSection: NotificationNavigationTarget.Section
+    let content: LoadedContent<SessionDetail>
+    let load: () async -> Void
+    let historyStore: RealSessionHistoryStore?
+
+    @State private var selectedSection: NotificationNavigationTarget.Section
+
+    init(sessionID: String, initialSection: NotificationNavigationTarget.Section, content: LoadedContent<SessionDetail>, load: @escaping () async -> Void, historyStore: RealSessionHistoryStore?) {
+        self.sessionID = sessionID
+        self.initialSection = initialSection
+        self.content = content
+        self.load = load
+        self.historyStore = historyStore
+        _selectedSection = State(initialValue: initialSection)
+    }
+
+    private var isOffline: Bool {
+        if case .offline = content { return true }
+        return false
+    }
+
+    var body: some View {
+        ZStack {
+            PremiumBackground()
+            detailContent
+        }
+        .navigationTitle("Détail")
+        .task(id: sessionID) { await load() }
+    }
+
+    @ViewBuilder private var detailContent: some View {
+        switch content {
+        case let .loaded(session), let .refreshing(.some(session)), let .offline(.some(session)), let .stale(session), let .loadedFromCache(session):
+            SessionDetailContent(session: session, selectedSection: $selectedSection, compact: false, historyStore: historyStore, isOffline: isOffline)
+        case .error:
+            PremiumErrorState(title: "Impossible de charger la session", message: "Vérifiez la connexion au serveur Botaplata.").padding()
+        case .idle, .loading, .refreshing(nil), .offline(nil), .partial:
+            VStack(spacing: BotaplataSpacing.md) { PremiumSkeletonCard(); PremiumSkeletonCard(); PremiumSkeletonCard() }.padding()
+        }
+    }
 }
 
-extension NotificationNavigationTarget.Section { var title: String { switch self { case .overview: "Vue d’ensemble"; case .journal: "Journal"; case .orders: "Ordres"; case .decisions: "Décisions"; case .chart: "Graphique" } } }
+struct SessionDetailView: View {
+    let session: SessionDetail
+    @State private var selectedSection: NotificationNavigationTarget.Section = .overview
 
-func freshnessText(_ freshness: DataFreshness) -> String { guard let date = freshness.updatedAt else { return "Fraîcheur inconnue" }; let seconds = max(0, Int(Date().timeIntervalSince(date))); if freshness.status == .stale { return "Dernière donnée connue il y a \(relative(seconds))" }; return "Mis à jour il y a \(relative(seconds))" }
-private func relative(_ seconds: Int) -> String { seconds < 60 ? "\(seconds) s" : seconds < 3600 ? "\(seconds / 60) min" : "\(seconds / 3600) h" }
+    var body: some View {
+        ZStack {
+            PremiumBackground()
+            SessionDetailContent(session: session, selectedSection: $selectedSection, compact: false, historyStore: nil, isOffline: false)
+        }
+        .navigationTitle(session.pair)
+    }
+}
+
+struct SessionDetailContent: View {
+    let session: SessionDetail
+    @Binding var selectedSection: NotificationNavigationTarget.Section
+    let compact: Bool
+    let historyStore: RealSessionHistoryStore?
+    let isOffline: Bool
+
+    private var headerSubtitle: String {
+        [session.providerLabel ?? session.provider.displayName, session.strategyName]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+    }
+
+    private var liveStatusText: String { session.lifecycle == .stopped ? "Terminée" : "LIVE" }
+    private var liveStatus: BadgeStatus { session.lifecycle == .stopped ? .neutral : .active }
+    private var freshnessText: String { SessionFreshnessPresentation.text(for: session.freshness) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+                detailHeader
+                sectionSelector
+            }
+            .padding([.horizontal, .top])
+            sectionContent
+        }
+        .safeAreaPadding(.bottom, BotaplataSpacing.xl)
+    }
+
+    private var detailHeader: some View {
+        PremiumCard(variant: .hero) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(session.pair).font(BotaplataTypography.largeTitle)
+                        Text(headerSubtitle).foregroundStyle(BotaplataColors.textSecondary)
+                    }
+                    Spacer()
+                    StatusPill(status: liveStatus, text: liveStatusText)
+                }
+                HStack {
+                    StatusPill(status: .waiting, text: SessionsPresentation.lifecycleTitle(session.lifecycle))
+                    FreshnessBadge(freshness: session.freshness)
+                }
+                Text(session.lifecycle.userMessage).foregroundStyle(BotaplataColors.textSecondary)
+                Text(freshnessText).font(.caption).foregroundStyle(BotaplataColors.textMuted)
+            }
+        }
+    }
+
+    private var sectionSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                ForEach(NotificationNavigationTarget.Section.allCases, id: \.self) { section in
+                    Button { selectedSection = section } label: {
+                        FilterPill(title: section.title, isSelected: selectedSection == section)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Section \(section.title)" + (selectedSection == section ? ", sélectionnée" : ""))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var sectionContent: some View {
+        switch selectedSection {
+        case .overview:
+            overview
+        case .journal:
+            journal
+        case .orders:
+            orders
+        case .decisions:
+            decisions
+        case .chart:
+            chart
+        }
+    }
+
+    private var overview: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+                if isOffline { PremiumOfflineBanner() }
+                ForEach(session.warnings) { WarningBanner(warning: $0) }
+                ReconciliationCard(session: session)
+                stateCard
+                marketCard
+                DecisionSummaryCard(session: session, detailed: true)
+                StrategyConditionsCard(decision: session.decision)
+                PositionCard(session: session)
+                if let order = session.activeOrder { ActiveOrderCard(order: order) }
+                SessionFinancialSummaryCard(session: session)
+                FeeAwareCard(fee: session.feeAware)
+                HealthFreshnessCard(session: session, cached: isOffline)
+            }
+            .padding()
+        }
+    }
+
+    @ViewBuilder private var journal: some View {
+        if let historyStore { SessionJournalHistoryView(session: session, store: historyStore) }
+        else { PremiumEmptyState(title: "Journal indisponible", message: "Aucune source locale n'est attachée à cette preview.") }
+    }
+
+    @ViewBuilder private var orders: some View {
+        if let historyStore { OrdersHistoryView(session: session, store: historyStore) }
+        else { PremiumEmptyState(title: "Ordres indisponibles", message: "Aucune source locale n'est attachée à cette preview.") }
+    }
+
+    @ViewBuilder private var decisions: some View {
+        if let historyStore { DecisionsHistoryView(session: session, store: historyStore) }
+        else { PremiumEmptyState(title: "Décisions indisponibles", message: "Aucune source locale n'est attachée à cette preview.") }
+    }
+
+    @ViewBuilder private var chart: some View {
+        if let historyStore { SessionChartView(session: session, store: historyStore) }
+        else { ChartContent(chart: PreviewFixtures.sessionChart) }
+    }
+
+    private var stateCard: some View {
+        PremiumCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("État actuel").font(BotaplataTypography.cardTitle)
+                Text(SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.headline)
+                Text(session.lifecycle.userMessage).foregroundStyle(BotaplataColors.textSecondary)
+                StatusPill(status: session.runtimeHealth == .healthy ? .success : .warning, text: session.runtimeHealth.label)
+                FreshnessBadge(freshness: session.freshness)
+                if let errors = session.monitoringConsecutiveErrors, errors > 0 {
+                    Text("\(errors) erreurs consécutives").foregroundStyle(BotaplataColors.warning)
+                }
+            }
+        }
+    }
+
+    private var marketCard: some View {
+        PremiumCard { VStack(alignment: .leading, spacing: 8) { Text("Marché").font(BotaplataTypography.cardTitle); row("Prix actuel", FinancialFormatters.money(session.currentPrice)) } }
+    }
+
+    private func row(_ key: String, _ value: String) -> some View {
+        PremiumKeyValueRow(label: key, value: value, monospaced: true)
+    }
+}
+
+extension NotificationNavigationTarget.Section {
+    var title: String {
+        switch self {
+        case .overview: "Vue d’ensemble"
+        case .journal: "Journal"
+        case .orders: "Ordres"
+        case .decisions: "Décisions"
+        case .chart: "Graphique"
+        }
+    }
+}
 
 #Preview("Liste nominale") { NavigationStack { SessionsView(content: .loaded(PreviewFixtures.sessionSummaries)) } }
 #Preview("Liste filtrée en cours") { NavigationStack { SessionsView(content: .loaded(PreviewFixtures.sessionSummaries)) } }

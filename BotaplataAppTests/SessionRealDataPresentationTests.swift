@@ -46,6 +46,13 @@ final class SessionRealDataPresentationTests: XCTestCase {
         XCTAssertFalse(RealSessionUIPresentation.feeAwareRows(PreviewFixtures.feeComplete).isEmpty)
     }
 
+    func testSessionFreshnessPresentationTexts() {
+        XCTAssertEqual(SessionFreshnessPresentation.text(for: DataFreshness(status: .fresh, updatedAt: nil, source: .backend)), "Données fraîches")
+        XCTAssertEqual(SessionFreshnessPresentation.text(for: DataFreshness(status: .aging, updatedAt: nil, source: .backend)), "Actualisation ralentie")
+        XCTAssertEqual(SessionFreshnessPresentation.text(for: DataFreshness(status: .stale, updatedAt: nil, source: .backend)), "Données anciennes")
+        XCTAssertEqual(SessionFreshnessPresentation.text(for: DataFreshness(status: .unknown, updatedAt: nil, source: .unknown)), "Fraîcheur inconnue")
+    }
+
     func testLocalSectionSelectionModelAndChartNoFakeSeries() {
         var selected: NotificationNavigationTarget.Section = .overview
         let initial = selected

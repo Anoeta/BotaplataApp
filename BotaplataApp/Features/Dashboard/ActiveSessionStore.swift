@@ -31,8 +31,14 @@ final class ActiveSessionStore {
                 try Task.checkCancellation()
                 if accepted { await cache.save(snapshot) }
             } catch is CancellationError { return }
-            catch AuthenticationError.accessTokenExpired { await MainActor.run { self.appState.transition(to: .expired) } }
-            catch AuthenticationError.deviceRevoked { await MainActor.run { self.appState.transition(to: .revoked) } }
+            catch AuthenticationError.accessTokenExpired { await MainActor.run {
+                self.appState.transition(to: .expired)
+                return
+            } }
+            catch AuthenticationError.deviceRevoked { await MainActor.run {
+                self.appState.transition(to: .revoked)
+                return
+            } }
             catch { await MainActor.run { self.apply(error) } }
         }
         refreshTask = task; await task.value; refreshTask = nil; resumePolling()
