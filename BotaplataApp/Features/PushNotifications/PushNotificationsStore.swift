@@ -14,6 +14,8 @@ final class PushNotificationsStore {
     var summary: RealNotificationSummary?
     var filters = NotificationFilters()
     var pendingNavigationTarget: NotificationNavigationTarget?
+    var savingPreferenceEventTypes: Set<String> = []
+    var preferenceMessage: String?
 
     private let repository: PushNotificationsRepository
     private let permissionManager: PushNotificationPermissionManaging
@@ -108,7 +110,10 @@ final class PushNotificationsStore {
     }
 
     func updatePreference(_ item: PushPreferenceItem, enabled: Bool) async {
-        guard !item.mandatory else { return }
+        guard !item.mandatory, !savingPreferenceEventTypes.contains(item.eventType) else { return }
+        let previous = currentPreferences()
+        savingPreferenceEventTypes.insert(item.eventType)
+        preferenceMessage = nil
         do {
             let current = self.currentPreferences()
             let update = PushPreferencesUpdate(categories: current.categories.map { preference in
@@ -116,8 +121,10 @@ final class PushNotificationsStore {
             })
             let prefs = try await self.withReplay { token in try await self.repository.updatePreferences(update, accessToken: token) }
             self.preferences = .loaded(prefs)
+            self.preferenceMessage = "Préférence enregistrée."
             await self.saveCache(preferences: prefs)
-        } catch { self.handle(error) }
+        } catch { self.preferences = .loaded(previous); self.preferenceMessage = "Impossible d’enregistrer ce réglage. Vérifiez la connexion au serveur Botaplata."; self.handle(error) }
+        savingPreferenceEventTypes.remove(item.eventType)
     }
 
     func markRead(_ item: RealNotificationItem) async {
@@ -166,6 +173,8 @@ final class PushNotificationsStore {
         self.preferences = .idle
         self.summary = nil
         self.pendingNavigationTarget = nil
+        self.savingPreferenceEventTypes.removeAll()
+        self.preferenceMessage = nil
         await self.cache.purge()
         await self.updateBadge()
     }
@@ -191,6 +200,8 @@ final class PushNotificationsStore {
         if (error as? AuthenticationError) == .deviceRevoked { self.appState.markRevoked() }
         else if (error as? AuthenticationError) == .accessTokenExpired { self.appState.markExpired() }
     }
+
+    func currentPreferencesSnapshot() -> PushPreferences { currentPreferences() }
 
     private func currentPreferences() -> PushPreferences {
         switch self.preferences {

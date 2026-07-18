@@ -70,3 +70,42 @@ final class ProfileStoreTests: XCTestCase {
         return (store, session, prefs)
     }
 }
+
+@MainActor
+final class ProfilePresentationTests: XCTestCase {
+    func testInitialsAndFallbackUser() {
+        XCTAssertEqual(ProfilePresentation.initials(for: AuthenticatedUser(id: "u", displayName: "Daniel Martin", roles: [], permissions: [])), "DM")
+        XCTAssertEqual(ProfilePresentation.displayName(for: AuthenticatedUser(id: "u", displayName: "   ", roles: [], permissions: [])), "Utilisateur Botaplata")
+        XCTAssertEqual(ProfilePresentation.initials(for: nil), "BP")
+    }
+
+    func testBiometricAndTwoFactorWording() {
+        XCTAssertEqual(ProfilePresentation.biometricMicrocopy(availability: .available), "Face ID verrouille l’application sur cet iPhone.")
+        XCTAssertEqual(ProfilePresentation.biometricMicrocopy(availability: .unavailable), "Indisponible sur cet appareil.")
+    }
+
+    func testCurrentDeviceAndRevocationPresentation() {
+        let current = AuthenticationFixtures.device
+        let other = AuthorizedDevice(id: "other", name: "iPhone de Daniel", model: "iPhone", osVersion: "26.0", appVersion: "1.0", locale: "fr-FR", createdAt: Date(), lastSeenAt: Date(), lastAuthenticatedAt: nil, isCurrent: false, isRevoked: false)
+        XCTAssertTrue(current.isCurrent)
+        XCTAssertFalse(other.isCurrent)
+        XCTAssertEqual(ProfilePresentation.devicesSummary(current: current, others: 1), "Cet iPhone · 1 autre appareil")
+        XCTAssertEqual(ProfilePresentation.deviceTitle(other), "iPhone de Daniel")
+    }
+
+    func testNotificationPermissionDeniedWordingAndPreferenceCopy() {
+        XCTAssertEqual(ProfilePresentation.permissionText(.denied), "Désactivées dans iOS")
+        XCTAssertEqual(ProfilePresentation.preferenceTitle("real_monitoring_degraded"), "Surveillance")
+        XCTAssertEqual(ProfilePresentation.preferenceDetail("real_order_rejected"), "Recevoir une notification lorsqu’un ordre change d’état.")
+    }
+
+    func testBundleVersionFormattingAndNoDangerousLabels() {
+        let diagnostic = ProfileDiagnostic(appVersion: "1.0", build: "42", environment: "Production", isBackendConfigured: true, authenticationState: "authentifiée", biometricState: "Activé")
+        XCTAssertEqual("Version \(diagnostic.appVersion) (\(diagnostic.build))", "Version 1.0 (42)")
+        let visible = [ProfilePresentation.preferenceTitle("real_monitoring_degraded"), ProfilePresentation.permissionText(.denied), ProfilePresentation.biometricMicrocopy(availability: .available)].joined(separator: " ").lowercased()
+        XCTAssertFalse(visible.contains("kraken api key"))
+        XCTAssertFalse(visible.contains("access token"))
+        XCTAssertFalse(visible.contains("refresh token"))
+        XCTAssertFalse(visible.contains("delete account"))
+    }
+}

@@ -123,3 +123,90 @@ extension ProfileStore {
 }
 #endif
 
+
+struct ProfilePreferencePresentation: Equatable {
+    let title: String
+    let value: String
+    let detail: String
+    let symbol: String
+}
+
+enum ProfilePresentation {
+    static func displayName(for user: AuthenticatedUser?) -> String {
+        let raw = user?.displayName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return raw.isEmpty ? "Utilisateur Botaplata" : raw
+    }
+
+    static func email(for user: AuthenticatedUser?) -> String? {
+        let raw = user?.displayName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return raw.contains("@") ? raw : nil
+    }
+
+    static func initials(for user: AuthenticatedUser?) -> String {
+        let name = displayName(for: user)
+        let parts = name.split(separator: " ").filter { !$0.isEmpty }
+        let letters = parts.prefix(2).compactMap { $0.first }.map(String.init).joined()
+        if !letters.isEmpty, name != "Utilisateur Botaplata" { return letters.uppercased() }
+        if let first = email(for: user)?.first { return String(first).uppercased() }
+        return "BP"
+    }
+
+    static func biometricMicrocopy(availability: BiometricAvailability) -> String {
+        availability == .available ? "Face ID verrouille l’application sur cet iPhone." : "Indisponible sur cet appareil."
+    }
+
+    static func devicesSummary(current: AuthorizedDevice?, others: Int) -> String {
+        let currentText = current == nil ? "Aucun appareil actuel identifié" : "Cet iPhone"
+        return others == 0 ? currentText : "\(currentText) · \(others) autre\(others > 1 ? "s" : "") appareil\(others > 1 ? "s" : "")"
+    }
+
+    static func deviceTitle(_ device: AuthorizedDevice) -> String {
+        let name = device.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "iPhone" : name
+    }
+
+    static func activityText(_ device: AuthorizedDevice, now: Date = Date()) -> String {
+        if device.isRevoked { return "Accès révoqué" }
+        if device.isCurrent { return "Actif maintenant" }
+        let date = device.lastSeenAt ?? device.lastAuthenticatedAt
+        guard let date else { return "Dernière activité inconnue" }
+        let rel = RelativeDateTimeFormatter(); rel.locale = Locale(identifier: "fr_FR"); rel.unitsStyle = .full
+        return "Dernière activité : " + rel.localizedString(for: date, relativeTo: now)
+    }
+
+    static func permissionText(_ status: PushAuthorizationStatus) -> String {
+        switch status { case .authorized, .provisional, .ephemeral: "Autorisées"; case .denied: "Désactivées dans iOS"; case .notDetermined: "Non demandées"; case .unknown: "Indisponibles" }
+    }
+
+    static func preferenceRows(_ preferences: PushPreferences) -> [ProfilePreferencePresentation] {
+        preferences.categories.map { item in
+            ProfilePreferencePresentation(title: preferenceTitle(item.eventType), value: item.mandatory ? "Toujours actif" : (item.enabled ? "Activée" : "Désactivée"), detail: preferenceDetail(item.eventType), symbol: preferenceSymbol(item.eventType))
+        }
+    }
+
+    static func preferenceTitle(_ event: String) -> String {
+        ["real_buy_filled":"Ordres", "real_sell_submitted":"Ordres", "real_sell_filled":"Ordres", "real_reconciliation_prolonged":"Vérification nécessaire", "real_monitoring_degraded":"Surveillance", "real_order_rejected":"Alertes critiques", "real_position_opened":"Sessions", "device_revoked":"Sécurité"][event] ?? event.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    static func preferenceDetail(_ event: String) -> String {
+        if event.contains("monitoring") { return "Être prévenu si Botaplata rencontre un problème de suivi." }
+        if event.contains("reconciliation") { return "Recevoir une notification lorsqu’une vérification demande votre attention." }
+        if event.contains("order") || event.contains("buy") || event.contains("sell") { return "Recevoir une notification lorsqu’un ordre change d’état." }
+        if event.contains("position") { return "Être prévenu lorsqu’une session change de position." }
+        return "Préférence fournie par le serveur Botaplata."
+    }
+
+    static func preferenceSymbol(_ event: String) -> String {
+        if event.contains("monitoring") { return "waveform.path.ecg" }
+        if event.contains("reconciliation") { return "checklist" }
+        if event.contains("order") || event.contains("buy") || event.contains("sell") { return "arrow.left.arrow.right" }
+        if event.contains("position") { return "chart.line.uptrend.xyaxis" }
+        return "bell"
+    }
+
+    static func lastSyncText(_ date: Date?, now: Date = Date()) -> String {
+        guard let date else { return "Inconnue" }
+        let rel = RelativeDateTimeFormatter(); rel.locale = Locale(identifier: "fr_FR"); rel.unitsStyle = .short
+        return rel.localizedString(for: date, relativeTo: now)
+    }
+}

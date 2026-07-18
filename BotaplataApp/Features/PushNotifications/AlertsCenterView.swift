@@ -23,10 +23,25 @@ struct UnreadIndicator: View { var body: some View { HStack(spacing: 4) { Circle
 
 extension HistoryPresentation { static func groupNotifications(_ items: [RealNotificationItem]) -> [(title: String, items: [RealNotificationItem])] { Dictionary(grouping: items) { Calendar.current.isDateInToday($0.createdAt) ? "Aujourd'hui" : (Calendar.current.isDateInYesterday($0.createdAt) ? "Hier" : fullDate($0.createdAt).components(separatedBy: " à ").first ?? fullDate($0.createdAt)) }.map { ($0.key, $0.value) }.sorted { $0.items.first?.createdAt ?? .distantPast > $1.items.first?.createdAt ?? .distantPast } } }
 
-struct PushPreferencesView: View { @Bindable var store: PushNotificationsStore; var body: some View { List { switch store.preferences { case .idle, .loading: ProgressView("Chargement…"); case .error: EmptyStateView(title: "Préférences indisponibles", message: "Réessayez plus tard."); case .loaded(let p), .loadedFromCache(let p), .refreshing(let p?), .offline(let p?), .partial(let p), .stale(let p): Section("Trading réel") { ForEach(p.categories) { item in PreferenceRow(item: item, toggle: { enabled in Task { await store.updatePreference(item, enabled: enabled) } }) } }; case .refreshing(nil), .offline(nil): EmptyStateView(title: "Préférences indisponibles", message: "Réessayez plus tard.") } }.navigationTitle("Préférences d'alertes").task { await store.bootstrap() } } }
-struct PreferenceRow: View { let item: PushPreferenceItem; let toggle: (Bool) -> Void; var body: some View { if item.mandatory { LabeledContent(label(for: item.eventType), value: "Toujours actif") } else { Toggle(isOn: Binding(get: { item.enabled }, set: toggle)) { Text(label(for: item.eventType)) } } }
-    private func label(for event: String) -> String { ["real_buy_filled":"Achat confirmé", "real_sell_submitted":"Ordre de vente envoyé", "real_sell_filled":"Vente confirmée", "real_reconciliation_prolonged":"Vérification prolongée", "real_monitoring_degraded":"Surveillance perturbée", "real_order_rejected":"Ordre rejeté", "real_position_opened":"Position ouverte" ][event] ?? event }
+struct PushPreferencesView: View {
+    @Bindable var store: PushNotificationsStore
+    var body: some View {
+        ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { header; content }.padding(BotaplataSpacing.md) } }
+            .navigationTitle("Préférences")
+            .task { await store.bootstrap() }
+            .overlay(alignment: .bottom) { if let message = store.preferenceMessage { Text(message).font(.footnote).padding().background(.thinMaterial, in: Capsule()).padding() } }
+    }
+    private var header: some View { PremiumCard(variant: .hero) { VStack(alignment: .leading, spacing: 8) { Text("Notifications Botaplata").font(BotaplataTypography.largeTitle); Text("Choisissez les alertes serveur que cet iPhone doit recevoir. La permission iOS reste distincte de ces préférences.").foregroundStyle(BotaplataColors.textSecondary) } } }
+    @ViewBuilder private var content: some View { switch store.preferences { case .idle, .loading: PremiumSkeletonCard(); case .error: PremiumErrorState(title: "Préférences indisponibles", message: "Réessayez plus tard."); case .loaded(let p), .loadedFromCache(let p), .refreshing(let p?), .offline(let p?), .partial(let p), .stale(let p): if p.categories.isEmpty { PremiumEmptyState(title: "Aucune préférence", message: "Le serveur Botaplata n’a fourni aucune préférence modifiable.") } else { ForEach(p.categories) { item in PremiumPreferenceCard(item: item, isSaving: store.savingPreferenceEventTypes.contains(item.eventType), toggle: { enabled in Task { await store.updatePreference(item, enabled: enabled) } }) } }; case .refreshing(nil), .offline(nil): PremiumErrorState(title: "Préférences indisponibles", message: "Vérifiez la connexion au serveur Botaplata.") } }
 }
+
+struct PremiumPreferenceCard: View {
+    let item: PushPreferenceItem
+    let isSaving: Bool
+    let toggle: (Bool) -> Void
+    var body: some View { PremiumCard { HStack(alignment: .center, spacing: BotaplataSpacing.md) { IconBadge(symbol: ProfilePresentation.preferenceSymbol(item.eventType), label: ProfilePresentation.preferenceTitle(item.eventType), color: item.enabled ? BotaplataColors.primaryMint : BotaplataColors.textMuted); VStack(alignment: .leading, spacing: 4) { Text(ProfilePresentation.preferenceTitle(item.eventType)).font(BotaplataTypography.cardTitle); Text(ProfilePresentation.preferenceDetail(item.eventType)).font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.textSecondary); if item.mandatory { Text("Toujours actif").font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.primaryMint) } }; Spacer(); if isSaving { ProgressView().tint(BotaplataColors.primaryMint) } else if item.mandatory { StatusPill(status: .active, text: "Obligatoire") } else { Toggle("", isOn: Binding(get: { item.enabled }, set: toggle)).labelsHidden().tint(BotaplataColors.primaryTeal) } } }.accessibilityElement(children: .combine) }
+}
+
 
 #Preview("Alertes nominales") { NavigationStack { AlertsCenterView(store: PushNotificationsStore.preview()) } }
 #Preview("Alerte critical") { PremiumAlertCard(item: PreviewFixtures.notifications[1]).padding().background(BotaplataColors.background) }
