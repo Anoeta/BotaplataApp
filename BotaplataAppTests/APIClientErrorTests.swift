@@ -13,7 +13,7 @@ final class APIClientErrorTests: XCTestCase {
             URLProtocolStub.handler = { _ in Self.response(status: status, code: code) }
             let client = APIClient(baseURL: URL(string: "https://botaplata.test")!, session: URLSession(configuration: Self.config()))
             do {
-                let _: EmptyResponse = try await client.send(APIEndpoint(method: .get, path: "/api/mobile/v1/test"), body: Optional<EmptyBody>.none)
+                let _: EmptyResponse = try await client.send(APIEndpoint(method: .get, path: "/api/mobile/v1/test"))
                 XCTFail("Expected backend error")
             } catch APIClientError.backend(let receivedStatus, let payload, let requestID) {
                 XCTAssertEqual(receivedStatus, status)

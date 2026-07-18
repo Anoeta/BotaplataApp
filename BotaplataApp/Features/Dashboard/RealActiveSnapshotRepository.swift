@@ -6,7 +6,7 @@ struct RemoteRealActiveSnapshotRepository: RealActiveSnapshotRepository {
     let client: APIClientProtocol
     func fetchActiveSnapshot(accessToken: String) async throws -> RealActiveSnapshot {
         do {
-            let envelope: APIEnvelope<RealActiveSnapshotDTO> = try await client.sendEnvelope(APIEndpoint(method: .get, path: "/api/mobile/v1/real/sessions/active-snapshot", headers: HTTPHeaders.bearer(accessToken)), body: Optional<EmptyBody>.none)
+            let envelope: APIEnvelope<RealActiveSnapshotDTO> = try await client.sendEnvelope(APIEndpoint(method: .get, path: "/api/mobile/v1/real/sessions/active-snapshot", headers: HTTPHeaders.bearer(accessToken)))
             guard let dto = envelope.data else { throw AuthenticationError.serverUnavailable }
             return dto.mapped(warnings: envelope.warnings, requestID: envelope.meta.requestID, serverTime: envelope.meta.serverTime)
         } catch APIClientError.business(let error, _) { throw error }
