@@ -13,6 +13,10 @@ struct RootView: View {
     @State private var didEnterBackground = false
     private let lockCoordinator = LocalBiometricLockCoordinator()
 
+    init() {
+        BotaplataTheme.applyTabBarAppearance()
+    }
+
     var body: some View {
         @Bindable var router = router
         Group {
@@ -24,7 +28,7 @@ struct RootView: View {
                     NavigationStack(path: $router.journalPath) { JournalContainerView(historyStore: realSessionHistoryStore, sessionsStore: realSessionsStore) }.tabItem { Label(AppTab.journal.title, systemImage: AppTab.journal.symbol) }.tag(AppTab.journal)
                     NavigationStack(path: $router.profilePath) { ProfileContainerView(store: profileStore, pushStore: pushStore) }.tabItem { Label(AppTab.profile.title, systemImage: AppTab.profile.symbol) }.tag(AppTab.profile)
                 }
-                .tint(BotaplataColors.accent)
+                .tint(BotaplataColors.primaryTeal)
             case .restoring:
                 AuthenticationRestoringView()
             case .unknown:
