@@ -45,7 +45,18 @@ final class ProfileStore {
     private var authStateText: String { switch appState.sessionState { case .authenticated, .refreshing, .offlineWithCachedSession: "authentifiée"; case .lockedLocally: "verrouillée localement"; case .revoked: "révoquée"; case .expired: "expirée"; default: "non authentifiée" } }
 
     func bootstrap() async { user = await authSession.user; biometricAvailability = await authenticator.availability(); biometricLockEnabled = await preferences.biometricLockEnabled(); await refreshDevices() }
-    func refreshDevices() async { if let loadTask { await loadTask.value; return }; let previous = activeDevices; devicesContent = previous.isEmpty ? .loading : .refreshing(previous); let task = Task { [weak self] in await self?.performRefresh(previous: previous) }; loadTask = task; await task.value; loadTask = nil }
+    func refreshDevices() async { 
+        if let loadTask { await loadTask.value; return }
+        let previous = activeDevices
+        devicesContent = previous.isEmpty ? .loading : .refreshing(previous)
+        let task: Task<Void, Never> = Task { [weak self] in
+            guard let self else { return }
+            await self.performRefresh(previous: previous)
+        }
+        loadTask = task
+        await task.value
+        loadTask = nil 
+    }
     private func performRefresh(previous: [AuthorizedDevice]) async {
         do { devicesContent = .loaded(try await authSession.authorizedDevices().filter { !$0.isRevoked }); user = await authSession.user }
         catch AuthenticationError.offline { devicesContent = previous.isEmpty ? .failed("Impossible de charger les appareils. Vérifiez votre connexion puis réessayez.") : .offline(previous, "Connexion momentanément indisponible. Dernier état connu affiché.") }
@@ -60,7 +71,16 @@ final class ProfileStore {
         guard result == .succeeded else { biometricLockEnabled = false; message = result == .cancelled ? nil : "Le verrouillage biométrique n'a pas été activé."; return }
         await preferences.setBiometricLockEnabled(true); biometricLockEnabled = true; message = "Verrouillage biométrique activé."
     }
-    func revoke(_ device: AuthorizedDevice) async { if let task = revocationTasks[device.id] { await task.value; return }; let task = Task { [weak self] in await self?.performRevoke(device) }; revocationTasks[device.id] = task; await task.value; revocationTasks[device.id] = nil }
+    func revoke(_ device: AuthorizedDevice) async { 
+        if let task = revocationTasks[device.id] { await task.value; return }
+        let task: Task<Void, Never> = Task { [weak self] in
+            guard let self else { return }
+            await self.performRevoke(device)
+        }
+        revocationTasks[device.id] = task
+        await task.value
+        revocationTasks[device.id] = nil 
+    }
     private func performRevoke(_ device: AuthorizedDevice) async {
         do { let result = try await authSession.revokeDevice(id: device.id); if result.currentDeviceRevoked { appState.markRevoked(); purge() } else { devicesContent = .loaded(activeDevices.filter { $0.id != result.revokedDeviceID }); message = "Accès révoqué." } }
         catch AuthenticationError.offline { message = "Connexion momentanément indisponible. Réessayez plus tard." }
@@ -102,3 +122,4 @@ extension ProfileStore {
     }
 }
 #endif
+
