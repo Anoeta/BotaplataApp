@@ -1,17 +1,97 @@
 import SwiftUI
 
-struct SessionsContainerView: View { @State var store: RealSessionsStore; @Environment(RealSessionHistoryStore.self) private var historyStore
-    var body: some View { SessionsView(content: store.content, warnings: store.warnings, loadNext: { id in await store.loadNextPageIfNeeded(currentItemID: id) }, refresh: { await store.refresh() }, detailContent: { id in store.details[id] ?? .idle }, loadDetail: { id in await store.loadDetail(id: id) }, historyStore: historyStore).task { store.start() }.navigationDestination(for: SessionRoute.self) { route in switch route { case .detail(let id, _): SessionDetailContainerView(sessionID: id, content: store.details[id] ?? .idle, load: { await store.loadDetail(id: id) }, historyStore: historyStore) } } }
+struct SessionsContainerView: View {
+    @State var store: RealSessionsStore
+    @Environment(RealSessionHistoryStore.self) private var historyStore
+
+    var body: some View {
+        SessionsView(
+            content: store.content,
+            warnings: store.warnings,
+            loadNext: { id in
+                await store.loadNextPageIfNeeded(currentItemID: id)
+            },
+            refresh: {
+                await store.refresh()
+            },
+            detailContent: { id in
+                store.details[id] ?? .idle
+            },
+            loadDetail: { id in
+                await store.loadDetail(id: id)
+            },
+            historyStore: historyStore
+        )
+        .task {
+            store.start()
+        }
+        .navigationDestination(for: SessionRoute.self) { route in
+            switch route {
+            case .detail(let id, _):
+                SessionDetailContainerView(
+                    sessionID: id,
+                    content: store.details[id] ?? .idle,
+                    load: {
+                        await store.loadDetail(id: id)
+                    },
+                    historyStore: historyStore
+                )
+            }
+        }
+    }
 }
 
 struct SessionsView: View {
-    let content: LoadedContent<[SessionSummary]>; var warnings: [Warning] = []; var loadNext: (String?) async -> Void = { _ in }; var refresh: () async -> Void = {}; var detailContent: (String) -> LoadedContent<SessionDetail> = { _ in .idle }; var loadDetail: (String) async -> Void = { _ in }; var historyStore: RealSessionHistoryStore? = nil
-    var body: some View { List { if isOffline { Text("Connexion momentanément indisponible. Dernier état connu affiché.").font(.caption).foregroundStyle(BotaplataColors.warning) }; ForEach(warnings) { warning in Text(warning.message).font(.caption).foregroundStyle(BotaplataColors.warning) }; contentView }.navigationTitle("Sessions").scrollContentBackground(.hidden).background(BotaplataColors.background).refreshable { await refresh() } }
+    let content: LoadedContent<[SessionSummary]>
+    var warnings: [Warning] = []
+    var loadNext: (String?) async -> Void = { _ in }
+    var refresh: () async -> Void = {}
+    var detailContent: (String) -> LoadedContent<SessionDetail> = { _ in .idle }
+    var loadDetail: (String) async -> Void = { _ in }
+    var historyStore: RealSessionHistoryStore? = nil
+
+    var body: some View {
+        List {
+            if isOffline {
+                Text("Connexion momentanément indisponible. Dernier état connu affiché.")
+                    .font(.caption)
+                    .foregroundStyle(BotaplataColors.warning)
+            }
+            ForEach(warnings) { warning in
+                Text(warning.message)
+                    .font(.caption)
+                    .foregroundStyle(BotaplataColors.warning)
+            }
+            contentView
+        }
+        .navigationTitle("Sessions")
+        .scrollContentBackground(.hidden)
+        .background(BotaplataColors.background)
+        .refreshable { await refresh() }
+    }
     @ViewBuilder var contentView: some View { switch content { case .idle, .loading: sessionsSkeleton; case .error: EmptyStateView(title: "Impossible de charger les sessions", message: "Vérifiez votre connexion puis réessayez."); case .loaded(let items), .loadedFromCache(let items), .refreshing(let items?), .offline(let items?), .partial(let items), .stale(let items): if items.isEmpty { EmptyStateView(title: "Aucune session réelle", message: "Aucune session Kraken réelle n'est disponible pour le moment.") } else { sections(items) }; case .refreshing(nil), .offline(nil): EmptyStateView(title: "Impossible de charger les sessions", message: "Vérifiez votre connexion puis réessayez.") } }
     var isOffline: Bool { if case .offline = content { true } else { false } }
     var sessionsSkeleton: some View { ForEach(0..<3, id: \.self) { _ in BotaplataCard { VStack(alignment: .leading) { Text("Chargement des sessions…").font(.headline); Text("Dernier état connu recherché").foregroundStyle(.secondary) } } } }
-    func sections(_ items: [SessionSummary]) -> some View { Group { let active = items.filter { !$0.isHistorical }; let history = items.filter(\.isHistorical); if !active.isEmpty { Section("En cours") { rows(active) } }; if !history.isEmpty { Section("Historique") { rows(history) } } } }
-    func rows(_ items: [SessionSummary]) -> some View { ForEach(items) { session in NavigationLink(value: SessionRoute.detail(id: session.id, section: .overview)) { SessionRow(session: session).task { await loadNext(session.id) } }.accessibilityLabel(accessibility(for: session)) } }
+    func sections(_ items: [SessionSummary]) -> some View {
+        Group {
+            let active = items.filter { !$0.isHistorical }
+            let history = items.filter(\.isHistorical)
+            if !active.isEmpty { Section("En cours") { rows(active) } }
+            if !history.isEmpty { Section("Historique") { rows(history) } }
+        }
+    }
+
+    func rows(_ items: [SessionSummary]) -> some View {
+        ForEach(items) { session in
+            NavigationLink(value: SessionRoute.detail(id: session.id, section: .overview)) {
+                SessionRow(session: session)
+                    .task {
+                        await loadNext(session.id)
+                    }
+            }
+            .accessibilityLabel(accessibility(for: session))
+        }
+    }
     func accessibility(for s: SessionSummary) -> String { "\(s.pair.replacingOccurrences(of: "/", with: " ")), \(s.providerLabel ?? s.provider.displayName), \(DashboardPresentation.wording(for: s.lifecycle).title), \(s.runtimeHealth.label), \(freshnessText(s.freshness))." }
 }
 
