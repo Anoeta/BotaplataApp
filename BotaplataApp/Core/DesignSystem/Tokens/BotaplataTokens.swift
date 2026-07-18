@@ -6,8 +6,8 @@ enum BotaplataColors {
     static let backgroundDeep = Color(red: 0.01, green: 0.03, blue: 0.07)
     static let backgroundNavy = Color(red: 0.00, green: 0.22, blue: 0.51)
     static let backgroundElevated = Color(red: 0.06, green: 0.11, blue: 0.19)
-    static let cardGlass = Color.white.opacity(0.075)
-    static let cardBorder = Color.white.opacity(0.14)
+    static let cardGlass = Color.white.opacity(0.105)
+    static let cardBorder = Color.white.opacity(0.22)
     static let primaryMint = Color(red: 0.37, green: 0.80, blue: 0.54)
     static let primaryTeal = Color(red: 0.00, green: 0.60, blue: 0.55)
     static let accentCyan = Color(red: 0.07, green: 0.63, blue: 0.83)
@@ -16,9 +16,10 @@ enum BotaplataColors {
     static let warning = Color(red: 0.98, green: 0.71, blue: 0.00)
     static let danger = Color(red: 0.96, green: 0.14, blue: 0.35)
     static let textPrimary = Color.white
-    static let textSecondary = Color.white.opacity(0.74)
-    static let textMuted = Color.white.opacity(0.52)
-    static let separator = Color.white.opacity(0.10)
+    static let textSecondary = Color.white.opacity(0.86)
+    static let textMuted = Color.white.opacity(0.70)
+    static let textDisabled = Color.white.opacity(0.50)
+    static let separator = Color.white.opacity(0.16)
     static let graphite = Color(red: 0.25, green: 0.25, blue: 0.25)
 
     // Backward-compatible aliases used by existing screens.
@@ -28,6 +29,7 @@ enum BotaplataColors {
     static let elevated = Color(red: 0.09, green: 0.15, blue: 0.25)
     static let accent = primaryTeal
     static let neutral = Color.gray
+
 }
 
 enum BotaplataGradients {
@@ -101,14 +103,27 @@ enum BotaplataSymbol {
 }
 
 enum BotaplataTheme {
+
+    static func applyNavigationAppearance() {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = UIColor(BotaplataColors.backgroundDeep.opacity(0.92))
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        UINavigationBar.appearance().tintColor = UIColor(BotaplataColors.primaryTeal)
+    }
+
     static func applyTabBarAppearance() {
         let appearance = UITabBarAppearance()
         appearance.configureWithTransparentBackground()
         appearance.backgroundColor = UIColor(BotaplataColors.backgroundElevated.opacity(0.92))
         appearance.stackedLayoutAppearance.selected.iconColor = UIColor(BotaplataColors.primaryTeal)
         appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor(BotaplataColors.primaryTeal)]
-        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.white.withAlphaComponent(0.56)
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.white.withAlphaComponent(0.56)]
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.white.withAlphaComponent(0.72)
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.white.withAlphaComponent(0.72)]
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }

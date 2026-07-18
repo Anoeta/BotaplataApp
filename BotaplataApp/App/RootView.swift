@@ -15,6 +15,7 @@ struct RootView: View {
 
     init() {
         BotaplataTheme.applyTabBarAppearance()
+        BotaplataTheme.applyNavigationAppearance()
     }
 
     var body: some View {

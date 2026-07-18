@@ -72,6 +72,6 @@ struct BotaplataApp: App {
     }
 
     var body: some Scene {
-        WindowGroup { RootView().environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).environment(profileStore).environment(pushStore).task { BotaplataAppDelegate.bridge = pushBridge; pushBridge.onDeviceToken = { token in Task { await pushStore.registerDeviceToken(token) } }; pushBridge.onForeground = { Task { await pushStore.refreshAll() } }; pushBridge.onNotificationTap = { target, id in Task { await pushStore.handleNotificationTap(target: target, notificationID: id, router: router) } }; if appState.sessionState == .unknown { await authStore.restore() } } }
+        WindowGroup { RootView().preferredColorScheme(.dark).environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).environment(profileStore).environment(pushStore).task { BotaplataAppDelegate.bridge = pushBridge; pushBridge.onDeviceToken = { token in Task { await pushStore.registerDeviceToken(token) } }; pushBridge.onForeground = { Task { await pushStore.refreshAll() } }; pushBridge.onNotificationTap = { target, id in Task { await pushStore.handleNotificationTap(target: target, notificationID: id, router: router) } }; if appState.sessionState == .unknown { await authStore.restore() } } }
     }
 }

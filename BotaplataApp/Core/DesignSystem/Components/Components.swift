@@ -21,7 +21,7 @@ struct PremiumCard<Content: View>: View {
     let variant: PremiumCardVariant
     @ViewBuilder var content: Content
     init(variant: PremiumCardVariant = .normal, @ViewBuilder content: () -> Content) { self.variant = variant; self.content = content() }
-    var body: some View { content.padding(BotaplataSpacing.md).frame(maxWidth: .infinity, alignment: .leading).background(variant.gradient, in: RoundedRectangle(cornerRadius: BotaplataRadius.lg, style: .continuous)).overlay(alignment: .topLeading) { RoundedRectangle(cornerRadius: BotaplataRadius.lg, style: .continuous).stroke(BotaplataColors.cardBorder, lineWidth: BotaplataBorder.subtle) }.shadow(color: variant.glow, radius: BotaplataShadow.radius, x: 0, y: BotaplataShadow.y) }
+    var body: some View { content.foregroundStyle(BotaplataColors.textPrimary).padding(BotaplataSpacing.md).frame(maxWidth: .infinity, alignment: .leading).background(variant.gradient, in: RoundedRectangle(cornerRadius: BotaplataRadius.lg, style: .continuous)).overlay(alignment: .topLeading) { RoundedRectangle(cornerRadius: BotaplataRadius.lg, style: .continuous).stroke(BotaplataColors.cardBorder, lineWidth: BotaplataBorder.subtle) }.shadow(color: variant.glow, radius: BotaplataShadow.radius, x: 0, y: BotaplataShadow.y) }
 }
 
 struct GlassCard<Content: View>: View { @ViewBuilder var content: Content; var body: some View { PremiumCard(variant: .elevated) { content } } }
@@ -52,8 +52,8 @@ struct PremiumPrimaryButtonStyle: ButtonStyle { func makeBody(configuration: Con
 struct PremiumSecondaryButtonStyle: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.font(.headline).padding(.horizontal, BotaplataSpacing.md).frame(minHeight: BotaplataTouch.minimum).foregroundStyle(BotaplataColors.textPrimary).background(BotaplataColors.cardGlass.opacity(configuration.isPressed ? 0.55 : 1), in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous)).overlay(RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous).stroke(BotaplataColors.cardBorder, lineWidth: 1)) } }
 struct PremiumDangerButtonStyle: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.font(.headline).padding(.horizontal, BotaplataSpacing.md).frame(maxWidth: .infinity, minHeight: BotaplataTouch.minimum).foregroundStyle(.white).background(BotaplataColors.danger.opacity(configuration.isPressed ? 0.70 : 0.92), in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous)) } }
 
-struct MoneyValue: View { let amount: MoneyAmount?; var body: some View { Text(FinancialFormatters.money(amount)).font(BotaplataTypography.monoValue) } }
-struct PercentageValue: View { let value: Decimal?; var body: some View { Text(FinancialFormatters.percent(value)).font(BotaplataTypography.monoValue) } }
+struct MoneyValue: View { let amount: MoneyAmount?; var body: some View { Text(FinancialFormatters.money(amount)).font(BotaplataTypography.monoValue).foregroundStyle(BotaplataColors.textPrimary) } }
+struct PercentageValue: View { let value: Decimal?; var body: some View { Text(FinancialFormatters.percent(value)).font(BotaplataTypography.monoValue).foregroundStyle(BotaplataColors.textPrimary) } }
 struct WarningBanner: View { let warning: Warning; var body: some View { PremiumCard(variant: warning.severity == .critical ? .danger : .warning) { Label { VStack(alignment: .leading, spacing: 3) { Text(warning.title).font(BotaplataTypography.cardTitle); Text(warning.message).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary) } } icon: { Image(systemName: warning.severity == .critical ? BotaplataSymbol.critical : BotaplataSymbol.warning) } }.accessibilityElement(children: .combine) }; }
 struct OfflineBanner: View { var body: some View { PremiumOfflineBanner() } }
 struct PremiumOfflineBanner: View { var body: some View { WarningBanner(warning: Warning(id: "offline", severity: .warning, title: "Connexion momentanément indisponible", message: "Dernier état connu affiché.")) } }
@@ -64,7 +64,61 @@ struct PremiumErrorState: View { let title: String; let message: String; var bod
 struct LoadingStateView: View { let title: String; let message: String; var body: some View { PremiumLoadingState(title: title, message: message) } }
 struct PremiumLoadingState: View { let title: String; let message: String; var body: some View { PremiumCard { HStack(spacing: BotaplataSpacing.md) { ProgressView().tint(BotaplataColors.primaryMint); VStack(alignment: .leading, spacing: 4) { Text(title).font(BotaplataTypography.cardTitle); Text(message).foregroundStyle(BotaplataColors.textSecondary) } } }.accessibilityElement(children: .combine) } }
 struct PremiumSkeletonCard: View { @Environment(\.accessibilityReduceMotion) private var reduceMotion; @State private var highlighted = false; var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Capsule().fill(BotaplataColors.cardBorder).frame(width: 140, height: 14); Capsule().fill(BotaplataColors.cardBorder.opacity(0.7)).frame(height: 24); Capsule().fill(BotaplataColors.cardBorder.opacity(0.55)).frame(width: 220, height: 12) }.opacity(highlighted ? 0.55 : 1) }.onAppear { guard !reduceMotion else { return }; withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { highlighted = true } }.accessibilityLabel("Données en préparation") } }
-struct SectionHeader: View { let title: String; let subtitle: String?; var body: some View { VStack(alignment: .leading, spacing: 3) { Text(title).font(BotaplataTypography.sectionTitle); if let subtitle { Text(subtitle).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary) } }.frame(maxWidth: .infinity, alignment: .leading) } }
+struct SectionHeader: View { let title: String; let subtitle: String?; var body: some View { VStack(alignment: .leading, spacing: 3) { Text(title).font(BotaplataTypography.sectionTitle).foregroundStyle(BotaplataColors.textPrimary); if let subtitle { Text(subtitle).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary) } }.frame(maxWidth: .infinity, alignment: .leading) } }
+
+struct PremiumKeyValueRow: View {
+    let label: String
+    let value: String
+    var valueColor: Color = BotaplataColors.textPrimary
+    var monospaced = false
+    var accessibilityLabel: String? = nil
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: BotaplataSpacing.sm) {
+            Text(label)
+                .font(BotaplataTypography.body)
+                .foregroundStyle(BotaplataColors.textSecondary)
+            Spacer(minLength: BotaplataSpacing.md)
+            Text(value == "—" ? "Indisponible" : value)
+                .font(monospaced ? BotaplataTypography.monoValue : BotaplataTypography.body.weight(.semibold))
+                .foregroundStyle(valueColor)
+                .monospacedDigit()
+                .multilineTextAlignment(.trailing)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel ?? "\(label), \(value == "—" ? "Indisponible" : value)")
+    }
+}
+
+struct PremiumSearchField: View {
+    let placeholder: String
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: BotaplataSpacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(BotaplataColors.textMuted)
+            TextField(placeholder, text: $text, prompt: Text(placeholder).foregroundStyle(BotaplataColors.textMuted))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .foregroundStyle(BotaplataColors.textPrimary)
+                .tint(BotaplataColors.primaryTeal)
+            if !text.isEmpty {
+                Button { text = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(BotaplataColors.textMuted)
+                }
+                .accessibilityLabel("Effacer la recherche")
+            }
+        }
+        .font(BotaplataTypography.body)
+        .padding(.horizontal, BotaplataSpacing.md)
+        .frame(minHeight: BotaplataTouch.minimum)
+        .background(BotaplataColors.cardGlass, in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous).stroke(BotaplataColors.cardBorder, lineWidth: 1))
+    }
+}
+
 struct MetricTile: View { let title: String; let value: String; let footnote: String?; var body: some View { MetricCard(title: title, value: value, footnote: footnote) } }
 
 #Preview("Premium Design System V2") { ZStack { PremiumBackground(); ScrollView { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { Text("Botaplata Premium").font(BotaplataTypography.largeTitle).foregroundStyle(BotaplataColors.textPrimary); PremiumCard(variant: .hero) { VStack(alignment: .leading) { LiveBadge(); Text("Session active").font(BotaplataTypography.cardTitle); Text("Botaplata surveille le marché.").foregroundStyle(BotaplataColors.textSecondary) } }; MetricCard(title: "Valeur estimée", value: "1 245,80 €", footnote: "Fixture locale", variant: .success); HStack { StatusPill(status: .active, text: "En cours"); SeverityBadge(level: .attention); SeverityBadge(level: .critical) }; HStack { FilterPill(title: "Toutes", isSelected: true); FilterPill(title: "À surveiller", isSelected: false) }; PremiumPrimaryButton(title: "Continuer", action: {}); PremiumSecondaryButton(title: "Voir le détail", action: {}); PremiumDangerButton(title: "Révoquer l'accès", action: {}); PremiumOfflineBanner(); PremiumEmptyState(title: "Aucune session réelle", message: "Les sessions Kraken apparaîtront ici lorsqu’elles seront disponibles."); PremiumLoadingState(title: "Données en préparation", message: "Botaplata prépare l’historique nécessaire."); PremiumSkeletonCard() }.padding() } } }
