@@ -3,7 +3,7 @@ import Foundation
 import FoundationNetworking
 #endif
 
-struct EmptyResponse: Decodable, Sendable {}
+nonisolated struct EmptyResponse: Decodable, Sendable {}
 
 enum APIClientError: Error, Sendable {
     case invalidURL, invalidVersion(String), httpStatus(Int, requestID: String?), backend(statusCode: Int, error: APIErrorPayload, requestID: String?), business(AuthenticationError, requestID: String?), decoding, network, cancelled, timeout
