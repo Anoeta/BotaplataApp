@@ -6,5 +6,7 @@
 	<string>$(BOTAPLATA_API_BASE_URL)</string>
 	<key>INFOPLIST_KEY_NSFaceIDUsageDescription</key>
 	<string>Botaplata utilise Face ID pour verrouiller localement l’accès aux informations de votre bot.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Botaplata utilise Face ID pour verrouiller localement l’accès aux informations de votre bot.</string>
 </dict>
 </plist>
