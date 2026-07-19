@@ -390,7 +390,7 @@ struct CandlestickChart: View {
                 chart
                     .frame(height: 300)
                     .onAppear { availableWidth = geometry.size.width }
-                    .onChange(of: geometry.size.width) { availableWidth = $0 }
+                    .onChange(of: geometry.size.width) { _, newWidth in availableWidth = newWidth }
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(accessibilitySummary)
             }
@@ -411,7 +411,7 @@ struct CandlestickChart: View {
         .overlay(alignment: tooltipAlignment) { tooltipContent }
     }
 
-    @ChartContentBuilder private var candlestickContent: some ChartContent {
+    @ChartContentBuilder private var candlestickContent: some Charts.ChartContent {
         ForEach(model.candles) { candle in
             RuleMark(
                 x: .value("Date", candle.openTime),
@@ -432,7 +432,7 @@ struct CandlestickChart: View {
         }
     }
 
-    @ChartContentBuilder private var indicatorsContent: some ChartContent {
+    @ChartContentBuilder private var indicatorsContent: some Charts.ChartContent {
         indicatorContent(
             isVisible: showVWAP,
             segments: model.vwapSegments,
@@ -470,7 +470,7 @@ struct CandlestickChart: View {
         segments: [[ChartIndicatorPoint]],
         label: String,
         color: Color
-    ) -> some ChartContent {
+    ) -> some Charts.ChartContent {
         if isVisible {
             ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
                 ForEach(segment) { point in
@@ -485,7 +485,7 @@ struct CandlestickChart: View {
         }
     }
 
-    @ChartContentBuilder private var markersContent: some ChartContent {
+    @ChartContentBuilder private var markersContent: some Charts.ChartContent {
         ForEach(model.markers) { marker in
             PointMark(
                 x: .value("Date", marker.timestamp),
@@ -497,7 +497,7 @@ struct CandlestickChart: View {
         }
     }
 
-    @ChartContentBuilder private var levelsContent: some ChartContent {
+    @ChartContentBuilder private var levelsContent: some Charts.ChartContent {
         ForEach(model.levels) { level in
             RuleMark(y: .value(level.title, level.price))
                 .foregroundStyle(BotaplataColors.accentCyan.opacity(0.55))
@@ -508,7 +508,7 @@ struct CandlestickChart: View {
         }
     }
 
-    @ChartContentBuilder private var selectionContent: some ChartContent {
+    @ChartContentBuilder private var selectionContent: some Charts.ChartContent {
         if let selected {
             RuleMark(x: .value("Sélection", selected.openTime))
                 .foregroundStyle(BotaplataColors.textPrimary)
@@ -616,11 +616,23 @@ struct CandlestickChart: View {
     private func selectionGesture(proxy: ChartProxy, geometry: GeometryProxy) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                let origin = geometry[proxy.plotAreaFrame].origin
-                let x = value.location.x - origin.x
-                if let date: Date = proxy.value(atX: x) {
-                    selected = TradingChartPresentation.nearestCandle(to: date, in: model.candles)
+                guard let plotFrame = proxy.plotFrame else {
+                    selected = nil
+                    return
                 }
+
+                let origin = geometry[plotFrame].origin
+                let xPosition = value.location.x - origin.x
+
+                guard let date: Date = proxy.value(atX: xPosition) else {
+                    selected = nil
+                    return
+                }
+
+                selected = TradingChartPresentation.nearestCandle(
+                    to: date,
+                    in: model.candles
+                )
             }
             .onEnded { _ in
                 selected = nil
