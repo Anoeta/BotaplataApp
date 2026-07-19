@@ -136,11 +136,43 @@ enum TradingChartPresentation {
         return best
     }
 
+    static let priceChartHeight: CGFloat = 268
+    static let volumeChartHeight: CGFloat = 72
+    static let chartCardSpacing: CGFloat = 16
+
     static func candleWidth(availableWidth: CGFloat, candleCount: Int) -> CGFloat {
         guard candleCount > 0, availableWidth.isFinite, availableWidth > 0 else {
             return 3
         }
-        return min(10, max(2, (availableWidth / CGFloat(candleCount)) * 0.55))
+        let densityWidth = (availableWidth / CGFloat(candleCount)) * 0.58
+        switch candleCount {
+        case 0...20:
+            return min(12, max(7, densityWidth))
+        case 21...100:
+            return min(7, max(3, densityWidth))
+        case 101...350:
+            return min(4, max(1.6, densityWidth))
+        default:
+            return min(2.4, max(1, densityWidth))
+        }
+    }
+
+    static func volumeBarWidth(availableWidth: CGFloat, candleCount: Int) -> CGFloat {
+        max(1, min(6, candleWidth(availableWidth: availableWidth, candleCount: candleCount) * 0.9))
+    }
+
+    static func xAxisDesiredCount(for range: TradingChartRange, candleCount: Int) -> Int {
+        guard candleCount > 12 else { return 3 }
+        switch range {
+        case .oneHour:
+            return 4
+        case .sixHours:
+            return 4
+        case .oneDay:
+            return 5
+        case .sevenDays:
+            return 4
+        }
     }
 
     static func continuousSegments(
@@ -265,11 +297,12 @@ struct RealTradingChartView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+            LazyVStack(alignment: .leading, spacing: BotaplataSpacing.lg) {
                 ChartRangeSelector(selected: selectedRange, select: select)
                 content
             }
             .padding()
+            .safeAreaPadding(.bottom, BotaplataSpacing.xxl)
         }
     }
 
@@ -320,31 +353,37 @@ struct RealTradingChartView: View {
     }
 
     private func chartContent(chart: TradingChart, model: RealTradingChartRenderModel) -> some View {
-        VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+        VStack(alignment: .leading, spacing: BotaplataSpacing.lg) {
             MarketSummary(chart: chart)
-            IndicatorControls(
-                model: model,
-                showVWAP: $showVWAP,
-                showEMA200: $showEMA200,
-                showBollinger: $showBollinger
-            )
-            CandlestickChart(
-                model: model,
-                showVWAP: showVWAP,
-                showEMA200: showEMA200,
-                showBollinger: showBollinger,
-                selected: $selected
-            )
-            if model.hasVolume {
-                VolumeChart(candles: model.candles)
+            PremiumCard {
+                VStack(alignment: .leading, spacing: TradingChartPresentation.chartCardSpacing) {
+                    Text("Graphique")
+                        .font(BotaplataTypography.cardTitle)
+                    IndicatorControls(
+                        model: model,
+                        showVWAP: $showVWAP,
+                        showEMA200: $showEMA200,
+                        showBollinger: $showBollinger
+                    )
+                    CandlestickChart(
+                        model: model,
+                        showVWAP: showVWAP,
+                        showEMA200: showEMA200,
+                        showBollinger: showBollinger,
+                        selected: $selected
+                    )
+                    if model.hasVolume {
+                        VolumeChart(candles: model.candles)
+                    }
+                    ChartLegend(
+                        model: model,
+                        showVWAP: showVWAP,
+                        showEMA200: showEMA200,
+                        showBollinger: showBollinger
+                    )
+                }
             }
             ChartLevelsSummary(levels: chart.levels, quote: chart.quoteAsset)
-            ChartLegend(
-                model: model,
-                showVWAP: showVWAP,
-                showEMA200: showEMA200,
-                showBollinger: showBollinger
-            )
             ForEach(chart.warnings) { warning in
                 WarningBanner(warning: warning)
             }
@@ -360,7 +399,7 @@ struct ChartRangeSelector: View {
     let select: (TradingChartRange) -> Void
 
     var body: some View {
-        HStack {
+        HStack(spacing: BotaplataSpacing.sm) {
             ForEach(TradingChartRange.allCases, id: \.self) { range in
                 Button(range.displayTitle) {
                     select(range)
@@ -385,16 +424,18 @@ struct CandlestickChart: View {
     @State private var availableWidth: CGFloat = 0
 
     var body: some View {
-        PremiumCard {
-            GeometryReader { geometry in
-                chart
-                    .frame(height: 300)
-                    .onAppear { availableWidth = geometry.size.width }
-                    .onChange(of: geometry.size.width) { _, newWidth in availableWidth = newWidth }
-                    .accessibilityElement(children: .contain)
-                    .accessibilityLabel(accessibilitySummary)
-            }
-        }
+        chart
+            .frame(maxWidth: .infinity)
+            .frame(height: TradingChartPresentation.priceChartHeight)
+            .background(
+                GeometryReader { geometry in
+                    Color.clear
+                        .onAppear { availableWidth = geometry.size.width }
+                        .onChange(of: geometry.size.width) { _, newWidth in availableWidth = newWidth }
+                }
+            )
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(accessibilitySummary)
     }
 
     private var chart: some View {
@@ -407,6 +448,12 @@ struct CandlestickChart: View {
         }
         .chartYScale(domain: priceDomain)
         .chartXAxis { chartXAxis }
+        .chartYAxis { chartYAxis }
+        .chartPlotStyle { plotArea in
+            plotArea
+                .background(BotaplataColors.backgroundNavy.opacity(0.18))
+                .clipShape(RoundedRectangle(cornerRadius: BotaplataRadius.sm, style: .continuous))
+        }
         .chartOverlay { proxy in chartOverlayContent(proxy: proxy) }
         .overlay(alignment: tooltipAlignment) { tooltipContent }
     }
@@ -416,7 +463,8 @@ struct CandlestickChart: View {
             RuleMark(
                 x: .value("Date", candle.openTime),
                 yStart: .value("Bas", candle.low),
-                yEnd: .value("Haut", candle.high)
+                yEnd: .value("Haut", candle.high),
+                width: .fixed(max(1, min(2, candleWidth * 0.35)))
             )
             .foregroundStyle(candleColor(for: candle))
 
@@ -501,7 +549,7 @@ struct CandlestickChart: View {
         ForEach(model.levels) { level in
             RuleMark(y: .value(level.title, level.price))
                 .foregroundStyle(BotaplataColors.accentCyan.opacity(0.55))
-                .annotation(position: .top, alignment: .leading) {
+                .annotation(position: .overlay, alignment: .leading) {
                     ChartLevelAnnotation(level: level)
                 }
                 .accessibilityLabel("Niveau \(level.title), \(level.price)")
@@ -523,10 +571,22 @@ struct CandlestickChart: View {
     }
 
     @AxisContentBuilder private var chartXAxis: some AxisContent {
-        AxisMarks(values: .automatic(desiredCount: 5)) {
-            AxisGridLine()
-            AxisTick()
-            AxisValueLabel(format: TradingChartPresentation.axisFormat(for: model.chart.range))
+        AxisMarks(values: .automatic(desiredCount: TradingChartPresentation.xAxisDesiredCount(for: model.chart.range, candleCount: model.candles.count))) {
+            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+            AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+            AxisValueLabel(format: TradingChartPresentation.axisFormat(for: model.chart.range), centered: false)
+                .font(.caption2)
+                .foregroundStyle(BotaplataColors.textSecondary)
+        }
+    }
+
+    @AxisContentBuilder private var chartYAxis: some AxisContent {
+        AxisMarks(position: .trailing, values: .automatic(desiredCount: 5)) {
+            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+            AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+            AxisValueLabel()
+                .font(.caption2)
+                .foregroundStyle(BotaplataColors.textSecondary)
         }
     }
 
@@ -646,7 +706,7 @@ struct ChartLevelAnnotation: View {
     var body: some View {
         Text(level.title)
             .font(.caption2)
-            .offset(y: level.offset)
+            .padding(.vertical, 2)
             .foregroundStyle(BotaplataColors.textSecondary)
     }
 }
@@ -660,17 +720,29 @@ extension Array {
 struct VolumeChart: View {
     let candles: [ChartRenderableCandle]
 
+    @State private var availableWidth: CGFloat = 0
+
     var body: some View {
-        PremiumCard {
-            Chart(candles.compactMap { $0.volume == nil ? nil : $0 }) { candle in
-                BarMark(
-                    x: .value("Date", candle.openTime),
-                    y: .value("Volume", candle.volume ?? 0)
-                )
-                .foregroundStyle(BotaplataColors.accentCyan.opacity(0.55))
-            }
-            .frame(height: 80)
+        Chart(candles.compactMap { $0.volume == nil ? nil : $0 }) { candle in
+            BarMark(
+                x: .value("Date", candle.openTime),
+                y: .value("Volume", candle.volume ?? 0),
+                width: .fixed(TradingChartPresentation.volumeBarWidth(availableWidth: availableWidth, candleCount: candles.count))
+            )
+            .foregroundStyle(BotaplataColors.accentCyan.opacity(0.55))
         }
+        .chartYAxis(.hidden)
+        .chartXAxis(.hidden)
+        .frame(maxWidth: .infinity)
+        .frame(height: TradingChartPresentation.volumeChartHeight)
+        .background(
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { availableWidth = geometry.size.width }
+                    .onChange(of: geometry.size.width) { _, newWidth in availableWidth = newWidth }
+            }
+        )
+        .accessibilityLabel("Volume des bougies")
     }
 }
 
@@ -681,7 +753,7 @@ struct IndicatorControls: View {
     @Binding var showBollinger: Bool
 
     var body: some View {
-        HStack {
+        HStack(alignment: .firstTextBaseline, spacing: BotaplataSpacing.sm) {
             if model.hasVWAP {
                 Toggle("VWAP", isOn: $showVWAP)
             }
@@ -805,13 +877,28 @@ struct ChartLegend: View {
     let showBollinger: Bool
 
     var body: some View {
-        Text(legendText)
-            .font(.caption)
-            .foregroundStyle(BotaplataColors.textSecondary)
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: BotaplataSpacing.xs)], alignment: .leading, spacing: BotaplataSpacing.xs) {
+            ForEach(legendItems, id: \.self) { item in
+                Text(item)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(BotaplataColors.textSecondary)
+                    .background(BotaplataColors.cardGlass.opacity(0.7), in: Capsule())
+            }
+        }
     }
 
-    private var legendText: String {
-        var parts = ["Légende : hausse/baisse", "bougie ouverte", "marqueurs backend", "niveaux persistés"]
+    private var legendItems: [String] {
+        var parts = ["Hausse", "Baisse", "Bougie ouverte"]
+        if !model.markers.isEmpty {
+            parts.append("Achats/Ventes")
+        }
+        if !model.levels.isEmpty {
+            parts.append("Niveaux")
+        }
         if model.hasVWAP && showVWAP {
             parts.append("VWAP")
         }
@@ -821,7 +908,7 @@ struct ChartLegend: View {
         if model.hasBollinger && showBollinger {
             parts.append("Bollinger")
         }
-        return parts.joined(separator: ", ") + "."
+        return parts
     }
 }
 
@@ -833,3 +920,64 @@ extension FinancialFormatters {
         return "\(NSDecimalNumber(decimal: value).stringValue) \(suffix)"
     }
 }
+
+#if DEBUG
+private extension TradingChart {
+    func withPreviewCandles(count: Int, range: TradingChartRange, levels: TradingLevels? = nil) -> TradingChart {
+        let base = generatedAt.addingTimeInterval(-Double(count * 300))
+        let candles = (0..<count).map { i -> TradingCandle in
+            let open = Decimal(string: "74")! + Decimal(i) / Decimal(80)
+            let close = open + (i % 2 == 0 ? Decimal(string: "0.08")! : Decimal(string: "-0.06")!)
+            return TradingCandle(
+                id: "preview-\(range.rawValue)-\(i)",
+                openTime: base.addingTimeInterval(Double(i * 300)),
+                closeTime: base.addingTimeInterval(Double((i + 1) * 300)),
+                isClosed: i != count - 1,
+                open: open,
+                high: max(open, close) + Decimal(string: "0.14")!,
+                low: min(open, close) - Decimal(string: "0.12")!,
+                close: close,
+                volume: Decimal(90 + (i % 20)),
+                vwap: open + Decimal(string: "0.03")!,
+                ema200: open - Decimal(string: "0.08")!,
+                bollingerUpper: open + Decimal(string: "0.35")!,
+                bollingerMiddle: open,
+                bollingerLower: open - Decimal(string: "0.35")!
+            )
+        }
+        return TradingChart(
+            sessionID: sessionID,
+            symbol: symbol,
+            displaySymbol: displaySymbol,
+            quoteAsset: quoteAsset,
+            range: range,
+            timeframe: "5m",
+            generatedAt: generatedAt,
+            dataSource: dataSource,
+            isComplete: isComplete,
+            hasMore: hasMore,
+            nextBefore: nextBefore,
+            candles: candles,
+            markers: markers,
+            levels: levels ?? self.levels,
+            warnings: warnings
+        )
+    }
+}
+
+#Preview("Graphique réel 1h / 11 bougies") {
+    RealTradingChartView(state: .loaded(PreviewFixtures.tradingChart(range: .oneHour).withPreviewCandles(count: 11, range: .oneHour, levels: TradingLevels(entryPrice: nil, breakEvenPrice: nil, minimumProfitableExitPrice: nil, trailingStopPrice: nil))), selectedRange: .oneHour, select: { _ in }, refresh: {})
+}
+
+#Preview("Graphique réel 6h / 71 bougies") {
+    RealTradingChartView(state: .loaded(PreviewFixtures.tradingChart(range: .sixHours).withPreviewCandles(count: 71, range: .sixHours, levels: TradingLevels(entryPrice: nil, breakEvenPrice: nil, minimumProfitableExitPrice: nil, trailingStopPrice: nil))), selectedRange: .sixHours, select: { _ in }, refresh: {})
+}
+
+#Preview("Graphique réel 24h / 287 bougies") {
+    RealTradingChartView(state: .loaded(PreviewFixtures.tradingChart(range: .oneDay).withPreviewCandles(count: 287, range: .oneDay, levels: TradingLevels(entryPrice: nil, breakEvenPrice: nil, minimumProfitableExitPrice: nil, trailingStopPrice: nil))), selectedRange: .oneDay, select: { _ in }, refresh: {})
+}
+
+#Preview("Graphique réel 7j / 672 bougies") {
+    RealTradingChartView(state: .loaded(PreviewFixtures.tradingChart(range: .sevenDays).withPreviewCandles(count: 672, range: .sevenDays)), selectedRange: .sevenDays, select: { _ in }, refresh: {})
+}
+#endif
