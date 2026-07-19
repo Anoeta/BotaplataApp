@@ -137,13 +137,20 @@ extension RealStrategyExplanationDataDTO {
 
 private extension Optional where Wrapped == StrategyExplanationFreshnessDTO {
     func mapped() -> StrategyFreshness {
-        let statusValue: String = self?.status ?? "unknown"
-        let isStaleValue: Bool = self?.isStale ?? self?.status == "stale"
+        let dto = self
+        let statusValue: String = dto?.status ?? "unknown"
+
+        let isStaleValue: Bool
+        if let explicit = dto?.isStale {
+            isStaleValue = explicit
+        } else {
+            isStaleValue = (dto?.status == "stale")
+        }
 
         return StrategyFreshness(
             status: statusValue,
-            label: self?.label,
-            summary: self?.summary,
+            label: dto?.label,
+            summary: dto?.summary,
             isStale: isStaleValue
         )
     }
@@ -360,3 +367,4 @@ private extension StrategyExplanationMetaDTO {
         )
     }
 }
+

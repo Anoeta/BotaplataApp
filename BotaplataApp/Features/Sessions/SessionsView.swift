@@ -562,22 +562,306 @@ extension NotificationNavigationTarget.Section {
 struct StrategyExplanationSectionView: View {
     let session: SessionDetail
     @Bindable var store: RealStrategyExplanationStore
-    var body: some View { ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { content }.padding() }.task { await store.load(sessionID: session.id, reason: "sectionOpened") }.refreshable { await store.refresh(sessionID: session.id) }.onDisappear { store.cancel(sessionID: session.id) } }
-    @ViewBuilder private var content: some View { switch store.state { case .idle, .loading: PremiumSkeletonCard(); PremiumSkeletonCard(); case .error(let message): PremiumErrorState(title: "Impossible de charger l’analyse", message: message); PremiumSecondaryButton(title: "Réessayer") { Task { await store.refresh(sessionID: session.id) } }; case .offlineCached: if let e = store.explanation { PremiumCard(variant: .warning) { Text("Dernière analyse connue").font(BotaplataTypography.cardTitle); Text(store.lastUpdatedAt.map(HistoryPresentation.fullDate) ?? "Date inconnue").foregroundStyle(BotaplataColors.textSecondary) }; StrategyExplanationContent(explanation: e) }; case .loaded, .refreshing, .empty: if store.isRefreshing { PremiumLoadingState(title: "Actualisation", message: "Botaplata récupère la dernière décision.") }; if let e = store.explanation { StrategyExplanationContent(explanation: e) } else { PremiumEmptyState(title: "Analyse indisponible", message: "Les indicateurs ne sont pas encore disponibles.") } } }
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+                content
+            }
+            .padding()
+        }
+        .task { await store.load(sessionID: session.id, reason: "sectionOpened") }
+        .refreshable { await store.refresh(sessionID: session.id) }
+        .onDisappear { store.cancel(sessionID: session.id) }
+    }
+    @ViewBuilder private var content: some View {
+        switch store.state {
+        case .idle, .loading:
+            PremiumSkeletonCard()
+            PremiumSkeletonCard()
+        case .error(let message):
+            PremiumErrorState(title: "Impossible de charger l’analyse", message: message)
+            PremiumSecondaryButton(title: "Réessayer") {
+                Task { await store.refresh(sessionID: session.id) }
+            }
+        case .offlineCached:
+            if let e = store.explanation {
+                PremiumCard(variant: .warning) {
+                    Text("Dernière analyse connue").font(BotaplataTypography.cardTitle)
+                    Text(store.lastUpdatedAt.map(HistoryPresentation.fullDate) ?? "Date inconnue").foregroundStyle(BotaplataColors.textSecondary)
+                }
+                StrategyExplanationContent(explanation: e)
+            }
+        case .loaded, .refreshing, .empty:
+            if store.isRefreshing {
+                PremiumLoadingState(title: "Actualisation", message: "Botaplata récupère la dernière décision.")
+            }
+            if let e = store.explanation {
+                StrategyExplanationContent(explanation: e)
+            } else {
+                PremiumEmptyState(title: "Analyse indisponible", message: "Les indicateurs ne sont pas encore disponibles.")
+            }
+        }
+    }
 }
 
-struct StrategyExplanationContent: View { let explanation: StrategyExplanation
-    var body: some View { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { StrategyDecisionHeroCard(explanation: explanation); StrategyScoreCard(score: explanation.score); StrategyConditionsExplanationCard(conditions: explanation.conditions); if !explanation.blockers.isEmpty { StrategyBlockersCard(blockers: explanation.blockers) }; StrategyMarketCard(market: explanation.market); StrategyIndicatorsCard(indicators: explanation.indicators.indicators); StrategyAnalysisBaseCard(analysis: explanation.analysis); if let p = explanation.positionProtection { StrategyPositionProtectionCard(protection: p) }; StrategyTechnicalDetailsCard(explanation: explanation) } }
+struct StrategyExplanationContent: View {
+    let explanation: StrategyExplanation
+    var body: some View {
+        VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+            StrategyDecisionHeroCard(explanation: explanation)
+            StrategyScoreCard(score: explanation.score)
+            StrategyConditionsExplanationCard(conditions: explanation.conditions)
+            if !explanation.blockers.isEmpty { StrategyBlockersCard(blockers: explanation.blockers) }
+            StrategyMarketCard(market: explanation.market)
+            StrategyIndicatorsCard(indicators: explanation.indicators.indicators)
+            StrategyAnalysisBaseCard(analysis: explanation.analysis)
+            if let p = explanation.positionProtection {
+                StrategyPositionProtectionCard(protection: p)
+            }
+            StrategyTechnicalDetailsCard(explanation: explanation)
+        }
+    }
 }
 
-struct StrategyDecisionHeroCard: View { let explanation: StrategyExplanation; var body: some View { PremiumCard(variant: explanation.analysis.freshness.isStale || explanation.decision.code == .safetyBlocked ? .warning : .hero) { VStack(alignment: .leading, spacing: 10) { Label(explanation.decision.label, systemImage: icon).font(BotaplataTypography.cardTitle); Text(explanation.decision.summary).foregroundStyle(BotaplataColors.textSecondary); if let score = explanation.score { Text("\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—")").font(.title2.bold()).monospacedDigit() }; if let close = explanation.analysis.candleCloseTime { Text("Dernière analyse : bougie clôturée à \(HistoryPresentation.time(close))").font(.caption).foregroundStyle(BotaplataColors.textMuted) } } } }
-    private var icon: String { switch explanation.decision.code { case .wait, .watch: "clock"; case .buyReady, .buySubmitted, .buyConfirmed: "arrow.up.circle"; case .positionOpen: "shield.checkered"; case .safetyBlocked, .dataStale: "exclamationmark.shield"; case .historyPreparing: "hourglass"; default: "info.circle" } }
+struct StrategyDecisionHeroCard: View {
+    let explanation: StrategyExplanation
+    var body: some View {
+        PremiumCard(variant: explanation.analysis.freshness.isStale || explanation.decision.code == .safetyBlocked ? .warning : .hero) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(explanation.decision.label, systemImage: icon).font(BotaplataTypography.cardTitle)
+                Text(explanation.decision.summary).foregroundStyle(BotaplataColors.textSecondary)
+                if let score = explanation.score {
+                    Text("\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—")").font(.title2.bold()).monospacedDigit()
+                }
+                if let close = explanation.analysis.candleCloseTime {
+                    Text("Dernière analyse : bougie clôturée à \(HistoryPresentation.time(close))").font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                }
+            }
+        }
+    }
+    private var icon: String {
+        switch explanation.decision.code {
+        case .wait, .watch: "clock"
+        case .buyReady, .buySubmitted, .buyConfirmed: "arrow.up.circle"
+        case .positionOpen: "shield.checkered"
+        case .safetyBlocked, .dataStale: "exclamationmark.shield"
+        case .historyPreparing: "hourglass"
+        default: "info.circle"
+        }
+    }
 }
-struct StrategyScoreCard: View { let score: StrategyScore?; var body: some View { PremiumCard { VStack(alignment: .leading, spacing: 8) { Text("Score et seuil").font(BotaplataTypography.cardTitle); if let score { Text(score.summary ?? "\(score.favorableConditions ?? 0) conditions sur \(score.totalConditions ?? 0) sont favorables").foregroundStyle(BotaplataColors.textSecondary); HStack { ForEach(0..<(score.totalConditions ?? 4), id: \.self) { i in Capsule().fill(i < (score.favorableConditions ?? 0) ? BotaplataColors.success : BotaplataColors.cardBorder).frame(height: 8) } }; PremiumKeyValueRow(label: "Score", value: "\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—")", monospaced: true); PremiumKeyValueRow(label: "Maximum", value: score.maximumRaw ?? "—", monospaced: true) } else { Text("Score en préparation").foregroundStyle(BotaplataColors.textSecondary) } } } } }
-struct StrategyConditionsExplanationCard: View { let conditions: [StrategyCondition]; var body: some View { PremiumCard { VStack(alignment: .leading, spacing: 10) { Text("Conditions").font(BotaplataTypography.cardTitle); ForEach(conditions) { c in VStack(alignment: .leading, spacing: 5) { HStack { Text(c.label).font(.headline); Spacer(); StatusPill(status: c.status == .favorable ? .success : c.status == .blocked ? .danger : .waiting, text: statusText(c.status)) }; Text(c.summary).foregroundStyle(BotaplataColors.textSecondary); if let v = c.valueRaw { PremiumKeyValueRow(label: "Valeur", value: v, monospaced: true) }; if let t = c.thresholdRaw { PremiumKeyValueRow(label: "Seuil", value: t, monospaced: true) }; if let d = c.technicalDetail { DisclosureGroup("Détail technique") { Text(d).font(.caption).foregroundStyle(BotaplataColors.textMuted) } } }.padding(.vertical, 4) } } } }; func statusText(_ s: StrategyConditionStatus) -> String { switch s { case .favorable: "Validé"; case .unfavorable: "À confirmer"; case .neutral: "Neutre"; case .unavailable: "Indisponible"; case .blocked: "Bloqué"; case .unknown: "À confirmer" } } }
-struct StrategyBlockersCard: View { let blockers: [StrategyBlocker]; var body: some View { PremiumCard(variant: .warning) { VStack(alignment: .leading, spacing: 10) { Text("Ce qui bloque l’action").font(BotaplataTypography.cardTitle); ForEach(blockers) { b in VStack(alignment: .leading, spacing: 5) { Text(b.label).font(.headline); Text(b.summary).foregroundStyle(BotaplataColors.textSecondary); PremiumKeyValueRow(label: "Sévérité", value: b.severityRaw); if let r = b.recoverable { PremiumKeyValueRow(label: "Récupérable", value: r ? "Oui" : "Non") }; if let d = b.technicalDetail { DisclosureGroup("Détail technique") { Text(d).font(.caption) } } } } } } } }
-struct StrategyMarketCard: View { let market: StrategyMarketContext; var body: some View { PremiumCard { VStack(alignment: .leading, spacing: 8) { Text("Contexte du marché").font(BotaplataTypography.cardTitle); PremiumKeyValueRow(label: "Régime", value: market.regime.label); PremiumKeyValueRow(label: "Momentum", value: market.momentum.label); if let s = market.summary { Text(s).foregroundStyle(BotaplataColors.textSecondary) }; market.regime.summary.map { Text($0).font(.caption).foregroundStyle(BotaplataColors.textMuted) }; market.momentum.summary.map { Text($0).font(.caption).foregroundStyle(BotaplataColors.textMuted) } } } } }
-struct StrategyIndicatorsCard: View { let indicators: [StrategyIndicator]; var body: some View { if !indicators.isEmpty { PremiumCard { VStack(alignment: .leading, spacing: 8) { Text("Indicateurs utilisés").font(BotaplataTypography.cardTitle); ForEach(indicators) { i in VStack(alignment: .leading, spacing: 4) { PremiumKeyValueRow(label: i.name, value: i.valueRaw ?? "Indisponible", monospaced: true); Text(i.help).font(.caption).foregroundStyle(BotaplataColors.textSecondary); if let d = i.technicalDetail { DisclosureGroup("Détail technique") { Text(d).font(.caption) } } } } } } } } }
-struct StrategyAnalysisBaseCard: View { let analysis: StrategyAnalysisContext; var body: some View { PremiumCard(variant: analysis.freshness.isStale ? .warning : .normal) { VStack(alignment: .leading, spacing: 8) { Text("Base de l’analyse").font(BotaplataTypography.cardTitle); if analysis.freshness.isStale { Text("Les dernières données ne sont plus assez récentes.").foregroundStyle(BotaplataColors.warning) }; analysis.timeframe.map { PremiumKeyValueRow(label: "Timeframe", value: $0) }; analysis.candleCloseTime.map { PremiumKeyValueRow(label: "Bougie clôturée", value: HistoryPresentation.fullDate($0), monospaced: true) }; analysis.calculatedAt.map { PremiumKeyValueRow(label: "Calculé à", value: HistoryPresentation.fullDate($0), monospaced: true) }; analysis.nextRecalculationAt.map { PremiumKeyValueRow(label: "Prochain recalcul", value: HistoryPresentation.fullDate($0), monospaced: true) }; PremiumKeyValueRow(label: "Fraîcheur", value: analysis.freshness.label ?? analysis.freshness.status) } } } }
-struct StrategyPositionProtectionCard: View { let protection: StrategyPositionProtection; var body: some View { PremiumCard(variant: .success) { VStack(alignment: .leading, spacing: 8) { Text("Protection de la position").font(BotaplataTypography.cardTitle); Text(protection.summary).foregroundStyle(BotaplataColors.textSecondary); [ ("Prix d’entrée", protection.entryPriceRaw), ("Prix actuel", protection.currentPriceRaw), ("PnL latent", protection.unrealizedPnLRaw), ("Seuil de rentabilité", protection.breakEvenPriceRaw), ("Prix minimum rentable", protection.minimumProfitablePriceRaw), ("Trailing stop", protection.trailingStopRaw) ].forEach { if let v = $0.1 { PremiumKeyValueRow(label: $0.0, value: v, monospaced: true) } }; if let t = protection.trailingActive { PremiumKeyValueRow(label: "Trailing actif", value: t ? "Oui" : "Non") }; if !protection.sellConditions.isEmpty { Text("Conditions de vente").font(.headline); ForEach(protection.sellConditions, id: \.self) { Text($0).font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } } } } }
-struct StrategyTechnicalDetailsCard: View { let explanation: StrategyExplanation; var body: some View { PremiumCard { DisclosureGroup("Détails techniques") { VStack(alignment: .leading, spacing: 6) { Text("Stratégie : \(explanation.strategy.code)"); if let d = explanation.decision.technicalDetail { Text(d) }; if let d = explanation.analysis.technicalDetail { Text(d) }; Text("Les valeurs sont fournies par le serveur Botaplata. L’iPhone ne recalcule aucun score, indicateur ou garde-fou.").foregroundStyle(BotaplataColors.textSecondary) }.font(.caption) } } } }
+
+struct StrategyScoreCard: View {
+    let score: StrategyScore?
+    var body: some View {
+        PremiumCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Score et seuil").font(BotaplataTypography.cardTitle)
+                if let score {
+                    Text(score.summary ?? "\(score.favorableConditions ?? 0) conditions sur \(score.totalConditions ?? 0) sont favorables").foregroundStyle(BotaplataColors.textSecondary)
+                    HStack {
+                        ForEach(0..<(score.totalConditions ?? 4), id: \.self) { i in
+                            Capsule().fill(i < (score.favorableConditions ?? 0) ? BotaplataColors.success : BotaplataColors.cardBorder).frame(height: 8)
+                        }
+                    }
+                    PremiumKeyValueRow(label: "Score", value: "\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—")", monospaced: true)
+                    PremiumKeyValueRow(label: "Maximum", value: score.maximumRaw ?? "—", monospaced: true)
+                } else {
+                    Text("Score en préparation").foregroundStyle(BotaplataColors.textSecondary)
+                }
+            }
+        }
+    }
+}
+
+struct StrategyConditionsExplanationCard: View {
+    let conditions: [StrategyCondition]
+    var body: some View {
+        PremiumCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Conditions").font(BotaplataTypography.cardTitle)
+                ForEach(conditions) { c in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(c.label).font(.headline)
+                            Spacer()
+                            StatusPill(status: c.status == .favorable ? .success : c.status == .blocked ? .danger : .waiting, text: statusText(c.status))
+                        }
+                        Text(c.summary).foregroundStyle(BotaplataColors.textSecondary)
+                        if let v = c.valueRaw {
+                            PremiumKeyValueRow(label: "Valeur", value: v, monospaced: true)
+                        }
+                        if let t = c.thresholdRaw {
+                            PremiumKeyValueRow(label: "Seuil", value: t, monospaced: true)
+                        }
+                        if let d = c.technicalDetail {
+                            DisclosureGroup("Détail technique") {
+                                Text(d).font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+    }
+    func statusText(_ s: StrategyConditionStatus) -> String {
+        switch s {
+        case .favorable: "Validé"
+        case .unfavorable: "À confirmer"
+        case .neutral: "Neutre"
+        case .unavailable: "Indisponible"
+        case .blocked: "Bloqué"
+        case .unknown: "À confirmer"
+        }
+    }
+}
+
+struct StrategyBlockersCard: View {
+    let blockers: [StrategyBlocker]
+    var body: some View {
+        PremiumCard(variant: .warning) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Ce qui bloque l’action").font(BotaplataTypography.cardTitle)
+                ForEach(blockers) { b in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(b.label).font(.headline)
+                        Text(b.summary).foregroundStyle(BotaplataColors.textSecondary)
+                        PremiumKeyValueRow(label: "Sévérité", value: b.severityRaw)
+                        if let r = b.recoverable {
+                            PremiumKeyValueRow(label: "Récupérable", value: r ? "Oui" : "Non")
+                        }
+                        if let d = b.technicalDetail {
+                            DisclosureGroup("Détail technique") {
+                                Text(d).font(.caption)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct StrategyMarketCard: View {
+    let market: StrategyMarketContext
+    var body: some View {
+        PremiumCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Contexte du marché").font(BotaplataTypography.cardTitle)
+                PremiumKeyValueRow(label: "Régime", value: market.regime.label)
+                PremiumKeyValueRow(label: "Momentum", value: market.momentum.label)
+                if let summary = market.regime.summary {
+                    Text(summary).font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                }
+                if let summary = market.momentum.summary {
+                    Text(summary).font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                }
+            }
+        }
+    }
+}
+
+struct StrategyIndicatorsCard: View {
+    let indicators: [StrategyIndicator]
+    var body: some View {
+        if !indicators.isEmpty {
+            PremiumCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Indicateurs utilisés").font(BotaplataTypography.cardTitle)
+                    ForEach(indicators) { i in
+                        VStack(alignment: .leading, spacing: 4) {
+                            PremiumKeyValueRow(label: i.name, value: i.valueRaw ?? "Indisponible", monospaced: true)
+                            Text(i.help).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                            if let d = i.technicalDetail {
+                                DisclosureGroup("Détail technique") {
+                                    Text(d).font(.caption)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct StrategyAnalysisBaseCard: View {
+    let analysis: StrategyAnalysisContext
+    var body: some View {
+        PremiumCard(variant: analysis.freshness.isStale ? .warning : .normal) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Base de l’analyse").font(BotaplataTypography.cardTitle)
+                if analysis.freshness.isStale {
+                    Text("Les dernières données ne sont plus assez récentes.").foregroundStyle(BotaplataColors.warning)
+                }
+                if let timeframe = analysis.timeframe {
+                    PremiumKeyValueRow(label: "Timeframe", value: timeframe)
+                }
+                if let close = analysis.candleCloseTime {
+                    PremiumKeyValueRow(label: "Bougie clôturée", value: HistoryPresentation.fullDate(close), monospaced: true)
+                }
+                if let calc = analysis.calculatedAt {
+                    PremiumKeyValueRow(label: "Calculé à", value: HistoryPresentation.fullDate(calc), monospaced: true)
+                }
+                if let next = analysis.nextRecalculationAt {
+                    PremiumKeyValueRow(label: "Prochain recalcul", value: HistoryPresentation.fullDate(next), monospaced: true)
+                }
+                PremiumKeyValueRow(label: "Fraîcheur", value: analysis.freshness.label ?? analysis.freshness.status)
+            }
+        }
+    }
+}
+
+struct StrategyPositionProtectionCard: View {
+    let protection: StrategyPositionProtection
+    var body: some View {
+        PremiumCard(variant: .success) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Protection de la position").font(BotaplataTypography.cardTitle)
+                Text(protection.summary).foregroundStyle(BotaplataColors.textSecondary)
+                if let v = protection.entryPriceRaw {
+                    PremiumKeyValueRow(label: "Prix d’entrée", value: v, monospaced: true)
+                }
+                if let v = protection.currentPriceRaw {
+                    PremiumKeyValueRow(label: "Prix actuel", value: v, monospaced: true)
+                }
+                if let v = protection.unrealizedPnLRaw {
+                    PremiumKeyValueRow(label: "PnL latent", value: v, monospaced: true)
+                }
+                if let v = protection.breakEvenPriceRaw {
+                    PremiumKeyValueRow(label: "Seuil de rentabilité", value: v, monospaced: true)
+                }
+                if let v = protection.minimumProfitablePriceRaw {
+                    PremiumKeyValueRow(label: "Prix minimum rentable", value: v, monospaced: true)
+                }
+                if let v = protection.trailingStopRaw {
+                    PremiumKeyValueRow(label: "Trailing stop", value: v, monospaced: true)
+                }
+                if let t = protection.trailingActive {
+                    PremiumKeyValueRow(label: "Trailing actif", value: t ? "Oui" : "Non")
+                }
+                if !protection.sellConditions.isEmpty {
+                    Text("Conditions de vente").font(.headline)
+                    ForEach(protection.sellConditions, id: \.self) { Text($0).font(.caption).foregroundStyle(BotaplataColors.textSecondary) }
+                }
+            }
+        }
+    }
+}
+
+struct StrategyTechnicalDetailsCard: View {
+    let explanation: StrategyExplanation
+    var body: some View {
+        PremiumCard {
+            DisclosureGroup("Détails techniques") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Stratégie : \(explanation.strategy.code)")
+                    if let d = explanation.decision.technicalDetail { Text(d) }
+                    if let d = explanation.analysis.technicalDetail { Text(d) }
+                    Text("Les valeurs sont fournies par le serveur Botaplata. L’iPhone ne recalcule aucun score, indicateur ou garde-fou.").foregroundStyle(BotaplataColors.textSecondary)
+                }.font(.caption)
+            }
+        }
+    }
+}
