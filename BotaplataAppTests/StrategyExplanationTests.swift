@@ -59,7 +59,61 @@ final class StrategyExplanationTests: XCTestCase {
         XCTAssertTrue(explanation.blockers.isEmpty)
         XCTAssertNil(explanation.positionProtection)
         XCTAssertEqual(explanation.score?.currentRaw, "3")
+        XCTAssertEqual(explanation.score?.current, 3)
     }
+
+
+    func testScoreDecodesJSONNumbersAsDomainIntegers() throws {
+        let model = try fixture("wait_3_of_4").mapped()
+
+        XCTAssertEqual(model.score?.current, 3)
+        XCTAssertEqual(model.score?.required, 4)
+        XCTAssertEqual(model.score?.maximum, 4)
+        XCTAssertEqual(model.score?.favorableConditions, 3)
+        XCTAssertEqual(model.score?.totalConditions, 4)
+    }
+
+    func testScoreDecodesNumericStringsForLegacyCompatibility() throws {
+        let json = baseExplanation(score: #"{"current":"3","required":"4","maximum":"4","favorable_conditions":"3","total_conditions":"4"}"#)
+        let model = try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: Data(json.utf8)).mapped()
+
+        XCTAssertEqual(model.score?.current, 3)
+        XCTAssertEqual(model.score?.required, 4)
+        XCTAssertEqual(model.score?.maximum, 4)
+        XCTAssertEqual(model.score?.favorableConditions, 3)
+        XCTAssertEqual(model.score?.totalConditions, 4)
+    }
+
+    func testScoreAbsentDoesNotBuildDomainScore() throws {
+        let json = baseExplanation(score: nil)
+        let model = try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: Data(json.utf8)).mapped()
+
+        XCTAssertNil(model.score)
+    }
+
+    func testNullableScoreFieldsRemainNil() throws {
+        let json = baseExplanation(score: #"{"current":null,"required":4,"maximum":4,"favorable_conditions":null,"total_conditions":4}"#)
+        let model = try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: Data(json.utf8)).mapped()
+
+        XCTAssertNil(model.score?.current)
+        XCTAssertEqual(model.score?.required, 4)
+        XCTAssertEqual(model.score?.maximum, 4)
+        XCTAssertNil(model.score?.favorableConditions)
+        XCTAssertEqual(model.score?.totalConditions, 4)
+    }
+
+    func testRejectsDecimalScoreField() throws {
+        let json = baseExplanation(score: #"{"current":3.5,"required":4,"maximum":4,"favorable_conditions":3,"total_conditions":4}"#)
+
+        XCTAssertThrowsError(try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: Data(json.utf8)))
+    }
+
+    func testRejectsNonNumericScoreString() throws {
+        let json = baseExplanation(score: #"{"current":"abc","required":4,"maximum":4,"favorable_conditions":3,"total_conditions":4}"#)
+
+        XCTAssertThrowsError(try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: Data(json.utf8)))
+    }
+
     private func fixture(_ name: String) throws -> RealStrategyExplanationDTO {
         try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: fixtureData(name))
     }
@@ -67,5 +121,10 @@ final class StrategyExplanationTests: XCTestCase {
     private func fixtureData(_ name: String) throws -> Data {
         let url = Bundle(for: Self.self).url(forResource: name, withExtension: "json", subdirectory: "Fixtures/MobileV1/StrategyExplanation")!
         return try Data(contentsOf: url)
+    }
+
+    private func baseExplanation(score: String?) -> String {
+        let scoreField = score.map { #", "score": \#($0)"# } ?? ""
+        return #"{"data":{"session_id":"27","strategy":{"code":"star_v3","name":"Star Strategy V3","version":"3"},"decision":{"code":"wait","label":"Attente","summary":"Résumé"}\#(scoreField),"analysis":{"freshness":{"status":"fresh","is_stale":false}},"market":{"regime":{"code":"range","label":"Range"},"momentum":{"code":"neutral","label":"Neutre"}},"conditions":[],"blockers":[],"indicators":{},"warnings":[]},"meta":{"data_source":"persisted_strategy_decision"}}"#
     }
 }
