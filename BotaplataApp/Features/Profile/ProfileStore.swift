@@ -8,7 +8,8 @@ struct ProfileDiagnostic: Equatable, Sendable {
     let isBackendConfigured: Bool
     let authenticationState: String
     let biometricState: String
-    var sanitizedText: String { "Botaplata \(appVersion) (\(build))\nEnvironnement : \(environment)\nSession : \(authenticationState)\nBackend : \(isBackendConfigured ? "configuré" : "non configuré")\nBiométrie : \(biometricState)" }
+    let serverURL: String
+    var sanitizedText: String { "Botaplata \(appVersion) (\(build))\nEnvironnement : \(environment)\nSession : \(authenticationState)\nBackend : \(isBackendConfigured ? "configuré" : "non configuré")\nURL serveur : \(serverURL)\nBiométrie : \(biometricState)" }
 }
 
 enum DevicesContent: Equatable {
@@ -40,7 +41,7 @@ final class ProfileStore {
     var currentDevice: AuthorizedDevice? { activeDevices.first { $0.isCurrent } }
     var otherDevices: [AuthorizedDevice] { activeDevices.filter { !$0.isCurrent } }
     var accessSummary: String { (user?.permissions.contains { $0.localizedCaseInsensitiveContains("read") } == true) ? "Lecture seule" : "Accès mobile" }
-    var diagnostic: ProfileDiagnostic { ProfileDiagnostic(appVersion: bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Inconnue", build: bundle.infoDictionary?["CFBundleVersion"] as? String ?? "Inconnu", environment: appState.environment.name, isBackendConfigured: appState.environment.baseURL != nil, authenticationState: authStateText, biometricState: biometricText) }
+    var diagnostic: ProfileDiagnostic { ProfileDiagnostic(appVersion: bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Inconnue", build: bundle.infoDictionary?["CFBundleVersion"] as? String ?? "Inconnu", environment: appState.environment.name, isBackendConfigured: appState.environment.baseURL != nil, authenticationState: authStateText, biometricState: biometricText, serverURL: appState.environment.baseURL?.absoluteString ?? "non configurée") }
     var biometricText: String { biometricAvailability == .available ? (biometricLockEnabled ? "Activé" : "Désactivé") : "Indisponible" }
     private var authStateText: String { switch appState.sessionState { case .authenticated, .refreshing, .offlineWithCachedSession: "authentifiée"; case .lockedLocally: "verrouillée localement"; case .revoked: "révoquée"; case .expired: "expirée"; default: "non authentifiée" } }
 

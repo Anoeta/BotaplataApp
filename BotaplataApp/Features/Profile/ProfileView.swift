@@ -85,8 +85,79 @@ struct AuthorizedDevicesView: View {
 
 struct PremiumDeviceCard: View { let device: AuthorizedDevice; let revoke: (AuthorizedDevice) -> Void; var body: some View { PremiumCard(variant: device.isRevoked ? .danger : device.isCurrent ? .success : .normal) { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { HStack(alignment: .top) { IconBadge(symbol: device.isCurrent ? "iphone.gen3" : "iphone", label: device.isCurrent ? "Cet iPhone" : "Appareil", color: device.isCurrent ? BotaplataColors.success : BotaplataColors.primaryMint); Spacer(); StatusPill(status: device.isRevoked ? .danger : device.isCurrent ? .success : .active, text: device.isRevoked ? "Révoqué" : device.isCurrent ? "Appareil actuel" : "Autorisé") }; Text(device.isCurrent ? "Cet iPhone" : ProfilePresentation.deviceTitle(device)).font(BotaplataTypography.cardTitle); Text([device.model, device.osVersion, "App \(device.appVersion)"].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(BotaplataColors.textSecondary); Text(ProfilePresentation.activityText(device)).font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.textMuted); if !device.isCurrent && !device.isRevoked { PremiumDangerButton(title: "Révoquer") { revoke(device) }.accessibilityLabel("Révoquer l’appareil \(ProfilePresentation.deviceTitle(device))") } } }.accessibilityElement(children: .combine).accessibilityLabel("Appareil autorisé, \(device.isCurrent ? "cet iPhone" : ProfilePresentation.deviceTitle(device)), \(ProfilePresentation.activityText(device))") } }
 
-struct DiagnosticView: View { let diagnostic: ProfileDiagnostic; var permissionStatus: PushAuthorizationStatus = .unknown; var body: some View { ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Diagnostic").font(BotaplataTypography.cardTitle); diag("Application", "Fonctionne normalement"); diag("Serveur Botaplata", diagnostic.isBackendConfigured ? "Disponible" : "Non configuré"); diag("Notifications", ProfilePresentation.permissionText(permissionStatus)); diag("Cache local", "Dernier état connu si disponible"); diag("Dernière synchronisation", "Voir les écrans de données") } }; PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Informations techniques").font(BotaplataTypography.cardTitle); diag("Version app", diagnostic.appVersion); diag("Build", diagnostic.build); diag("Environnement", diagnostic.environment); diag("Session", diagnostic.authenticationState); diag("Biométrie", diagnostic.biometricState) } } }.padding(BotaplataSpacing.md) } }.navigationTitle("Diagnostic") }
-    private func diag(_ title: String, _ value: String) -> some View { HStack { Text(title); Spacer(); Text(value).foregroundStyle(BotaplataColors.textSecondary) }.font(BotaplataTypography.body).accessibilityElement(children: .combine) }
+struct DiagnosticView: View {
+    let diagnostic: ProfileDiagnostic
+    var permissionStatus: PushAuthorizationStatus = .unknown
+    @State private var entries: [NetworkDiagnosticEntry] = []
+
+    var body: some View {
+        ZStack {
+            PremiumBackground()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+                    PremiumCard {
+                        VStack(alignment: .leading, spacing: BotaplataSpacing.sm) {
+                            Text("Diagnostic Botaplata").font(BotaplataTypography.cardTitle)
+                            diag("URL serveur", diagnostic.serverURL)
+                            diag("État réseau", diagnostic.isBackendConfigured ? "Serveur configuré" : "Non configuré")
+                            diag("Dernier health check", last(feature: "Diagnostics"))
+                            diag("Dernier login", last(endpointContains: "/auth/login"))
+                            diag("Dernier refresh token", last(endpointContains: "/auth/refresh"))
+                            diag("Dernier Dashboard", last(feature: "Dashboard"))
+                            diag("Dernière liste Sessions", last(endpointContains: "/real/sessions"))
+                            diag("Dernier détail session", lastDetail())
+                            diag("Historique mémoire", "\(entries.count)/50 requêtes")
+                        }
+                    }
+                    PremiumCard {
+                        VStack(alignment: .leading, spacing: BotaplataSpacing.sm) {
+                            Text("Actions Debug").font(BotaplataTypography.cardTitle)
+                            Button("Tester le serveur") { Task { await reloadDiagnostics() } }
+                            Button("Copier le diagnostic") { copyDiagnostic() }
+                            Button("Effacer les métriques") { Task { await NetworkDiagnosticsStore.shared.reset(); await reloadDiagnostics() } }
+                        }
+                    }
+                    if !entries.isEmpty {
+                        PremiumCard {
+                            VStack(alignment: .leading, spacing: BotaplataSpacing.sm) {
+                                Text("Dernières requêtes").font(BotaplataTypography.cardTitle)
+                                ForEach(entries.suffix(10)) { entry in
+                                    diag("[\(entry.requestID)] \(entry.method) \(entry.endpoint)", "\(entry.result.rawValue) · \(String(format: "%.3f", entry.duration))s · \(entry.statusCode.map(String.init) ?? "—")")
+                                }
+                            }
+                        }
+                    }
+                    PremiumCard {
+                        VStack(alignment: .leading, spacing: BotaplataSpacing.sm) {
+                            Text("Informations techniques").font(BotaplataTypography.cardTitle)
+                            diag("Version app", diagnostic.appVersion)
+                            diag("Build", diagnostic.build)
+                            diag("Environnement", diagnostic.environment)
+                            diag("Session", diagnostic.authenticationState)
+                            diag("Notifications", ProfilePresentation.permissionText(permissionStatus))
+                            diag("Biométrie", diagnostic.biometricState)
+                        }
+                    }
+                }
+                .padding(BotaplataSpacing.md)
+            }
+        }
+        .navigationTitle("Diagnostic")
+        .task { await reloadDiagnostics() }
+    }
+
+    private func reloadDiagnostics() async { entries = await NetworkDiagnosticsStore.shared.snapshot() }
+    private func last(feature: String) -> String { entries.last { $0.feature == feature }.map(summary) ?? "aucun" }
+    private func last(endpointContains value: String) -> String { entries.last { $0.endpoint.contains(value) }.map(summary) ?? "aucun" }
+    private func lastDetail() -> String { entries.last { $0.endpoint.contains("/real/sessions/") && !$0.endpoint.contains("chart") }.map(summary) ?? "aucun" }
+    private func summary(_ entry: NetworkDiagnosticEntry) -> String { "\(entry.result.rawValue) · \(String(format: "%.3f", entry.duration))s · HTTP \(entry.statusCode.map(String.init) ?? "—") · cache \(entry.cacheStatus.rawValue)" }
+    private func copyDiagnostic() {
+        let text = ([diagnostic.sanitizedText] + entries.map { "[\($0.requestID)] \($0.method) \($0.endpoint) \($0.feature) \($0.result.rawValue) \(String(format: "%.3f", $0.duration))s" }).joined(separator: "\n")
+        #if canImport(UIKit)
+        UIPasteboard.general.string = text
+        #endif
+    }
+    private func diag(_ title: String, _ value: String) -> some View { HStack(alignment: .top) { Text(title); Spacer(); Text(value).foregroundStyle(BotaplataColors.textSecondary).multilineTextAlignment(.trailing) }.font(BotaplataTypography.body).accessibilityElement(children: .combine) }
 }
 
 struct AboutBotaplataView: View { let diagnostic: ProfileDiagnostic; var body: some View { ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { PremiumCard(variant: .hero) { VStack(alignment: .leading, spacing: 8) { Text("Botaplata").font(BotaplataTypography.largeTitle); Text("Version \(diagnostic.appVersion) (\(diagnostic.build))").foregroundStyle(BotaplataColors.textSecondary); Text("Supervision sécurisée de votre bot Kraken.").font(BotaplataTypography.body) } }; PremiumCard { VStack(alignment: .leading, spacing: 8) { Text("Fonctionnement de l’app").font(BotaplataTypography.cardTitle); Text("Botaplata affiche les informations fournies par votre serveur personnel. L’application ne contacte jamais Kraken directement et ne permet pas d’envoyer manuellement des ordres.").foregroundStyle(BotaplataColors.textSecondary) } }; PremiumCard { VStack(alignment: .leading, spacing: 8) { Text("Vos données").font(BotaplataTypography.cardTitle); Text("Les identifiants Kraken restent sur votre serveur Botaplata. Cet iPhone ne stocke aucune clé Kraken. Le refresh token est protégé par le Trousseau de l’iPhone.").foregroundStyle(BotaplataColors.textSecondary) } } }.padding(BotaplataSpacing.md) } }.navigationTitle("À propos") } }

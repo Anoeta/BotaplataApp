@@ -5,6 +5,9 @@ struct LoginView: View {
     @Environment(AppState.self) private var appState
     @State private var username = ""
     @State private var password = ""
+    @FocusState private var focusedField: LoginField?
+
+    private enum LoginField { case username, password }
 
     var body: some View {
         @Bindable var store = store
@@ -28,6 +31,9 @@ struct LoginView: View {
                                 .autocorrectionDisabled()
                                 .submitLabel(.next)
                                 .accessibilityIdentifier("login.username")
+                                .focused($focusedField, equals: .username)
+                                .disabled(store.isSubmitting)
+                                .onSubmit { focusedField = .password }
                                 .accessibilityLabel("Champ email")
 
                             PremiumSecureField(title: "Mot de passe", text: $password, systemImage: "lock.fill")
@@ -36,19 +42,22 @@ struct LoginView: View {
                                 .autocorrectionDisabled()
                                 .submitLabel(.go)
                                 .accessibilityIdentifier("login.password")
+                                .focused($focusedField, equals: .password)
+                                .disabled(store.isSubmitting)
                                 .accessibilityLabel("Champ mot de passe sécurisé")
-                                .onSubmit { submit() }
+                                .onSubmit { focusedField = nil; submit() }
 
                             if case .error(let message) = store.loginPhase {
                                 AuthInlineError(message: message)
                                     .accessibilityIdentifier("login.error")
                             }
 
-                            PremiumPrimaryButton(title: "Se connecter", isLoading: store.loginPhase == .loading) { submit() }
+                            PremiumPrimaryButton(title: store.isSubmitting ? "Connexion…" : "Se connecter", isLoading: store.isSubmitting) { focusedField = nil; submit() }
                                 .disabled(!canSubmit)
                                 .opacity(canSubmit ? 1 : 0.55)
                                 .accessibilityIdentifier("login.submit")
                                 .accessibilityHint(canSubmit ? "Valide la connexion au serveur Botaplata" : "Renseignez votre email et votre mot de passe")
+                                .accessibilityValue(store.isSubmitting ? "Connexion en cours" : "")
                         }
                     }
 
@@ -81,8 +90,11 @@ struct LoginView: View {
         guard canSubmit else { return }
         let u = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let p = password
-        password = ""
-        Task { await store.login(username: u, password: p) }
+        focusedField = nil
+        Task {
+            await store.login(username: u, password: p)
+            if store.challenge != nil || appState.sessionState == .authenticated { password = ""; focusedField = nil }
+        }
     }
 }
 
