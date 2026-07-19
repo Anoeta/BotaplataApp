@@ -9,6 +9,7 @@ nonisolated enum BotaplataLog {
     static let sessions = Logger(subsystem: subsystem, category: "Sessions")
     static let lifecycle = Logger(subsystem: subsystem, category: "Lifecycle")
     static let performance = Logger(subsystem: subsystem, category: "Performance")
+    static let chart = Logger(subsystem: subsystem, category: "Chart")
     static let pointsOfInterest = OSLog(subsystem: subsystem, category: .pointsOfInterest)
 }
 

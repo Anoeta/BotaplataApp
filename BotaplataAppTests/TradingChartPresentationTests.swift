@@ -11,4 +11,21 @@ final class TradingChartPresentationTests: XCTestCase {
     private func makeCandles(count: Int) -> [ChartRenderableCandle] { (0..<count).map { candle(id: "c\($0)", t: TimeInterval($0 * 60)) } }
     private func candle(id: String, t: TimeInterval, low: Double = 1, high: Double = 2, vwap: Double? = nil, ema200: Double? = nil, bollingerUpper: Double? = nil, bollingerMiddle: Double? = nil, bollingerLower: Double? = nil) -> ChartRenderableCandle { ChartRenderableCandle(id: id, openTime: Date(timeIntervalSince1970: t), closeTime: Date(timeIntervalSince1970: t + 60), isClosed: true, open: low, high: high, low: low, close: high, volume: nil, vwap: vwap, ema200: ema200, bollingerUpper: bollingerUpper, bollingerMiddle: bollingerMiddle, bollingerLower: bollingerLower) }
     private func makeTradingCandles(count: Int) -> [TradingCandle] { (0..<count).map { TradingCandle(id: "c\($0)", openTime: Date(timeIntervalSince1970: Double($0 * 60)), closeTime: Date(timeIntervalSince1970: Double($0 * 60 + 60)), isClosed: true, open: 1, high: 2, low: 1, close: 2, volume: nil, vwap: nil, ema200: nil, bollingerUpper: nil, bollingerMiddle: nil, bollingerLower: nil) } }
+    func testRangeRawValuesMatchBackendContract() {
+        XCTAssertEqual(TradingChartRange.oneHour.rawValue, "1h")
+        XCTAssertEqual(TradingChartRange.sixHours.rawValue, "6h")
+        XCTAssertEqual(TradingChartRange.oneDay.rawValue, "24h")
+        XCTAssertEqual(TradingChartRange.sevenDays.rawValue, "7d")
+        let rawValues = TradingChartRange.allCases.map(\.rawValue).joined(separator: ",")
+        XCTAssertFalse(rawValues.contains("oneHour"))
+        XCTAssertFalse(rawValues.contains("sixHours"))
+        XCTAssertFalse(rawValues.contains("24hours"))
+        XCTAssertFalse(rawValues.contains("sevenDays"))
+    }
+
+    func testZeroLevelsAreHidden() {
+        let levels = TradingChartPresentation.renderableLevels(TradingLevels(entryPrice: 0, breakEvenPrice: 74.4, minimumProfitableExitPrice: nil, trailingStopPrice: 0))
+        XCTAssertEqual(levels.map(\.id), ["breakEven"])
+    }
+
 }
