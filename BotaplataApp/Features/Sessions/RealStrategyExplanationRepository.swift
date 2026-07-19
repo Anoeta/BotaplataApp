@@ -6,7 +6,7 @@ protocol RealStrategyExplanationRepository: Sendable { func fetchStrategyExplana
 struct RemoteRealStrategyExplanationRepository: RealStrategyExplanationRepository { let client: APIClientProtocol
     func fetchStrategyExplanation(sessionID: String, accessToken: String) async throws -> StrategyExplanation {
         BotaplataLog.strategyExplanation.info("StrategyExplanationRepository.fetch session=\(sessionID, privacy: .public)")
-        do { let envelope: APIEnvelope<RealStrategyExplanationDTO> = try await client.sendEnvelope(APIEndpoint(method: .get, path: "/api/mobile/v1/real/sessions/\(sessionID)/strategy-explanation", headers: HTTPHeaders.bearer(accessToken))); guard let dto = envelope.data else { throw AuthenticationError.serverUnavailable }; BotaplataLog.strategyExplanation.info("DECODING SUCCESS dto=RealStrategyExplanationDTO"); return dto.mapped() }
+        do { let dto: RealStrategyExplanationDTO = try await client.request(APIEndpoint(method: .get, path: "/api/mobile/v1/real/sessions/\(sessionID)/strategy-explanation", headers: HTTPHeaders.bearer(accessToken))); return dto.mapped() }
         catch APIClientError.business(let error, _) { throw error }
         catch APIClientError.backend(_, let payload, _) { throw AuthenticationError(code: payload.code) }
         catch APIClientError.httpStatus(401, _) { throw AuthenticationError.accessTokenExpired }

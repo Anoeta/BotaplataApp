@@ -150,6 +150,6 @@
     "request_id": "r1",
     "server_time": "2026-07-19T09:55:00Z",
     "generated_at": "2026-07-19T09:55:00Z",
-    "source": "persisted_strategy_decision"
+    "data_source": "persisted_strategy_decision"
   }
 }
