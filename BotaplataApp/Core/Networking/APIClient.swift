@@ -16,6 +16,69 @@ struct APIClient: APIClientProtocol {
     let timeout: TimeInterval
     init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 15) { self.baseURL = baseURL; self.session = session; self.timeout = timeout }
 
+
+    func request<Response: Decodable & Sendable>(_ endpoint: APIEndpoint) async throws -> Response {
+        try await request(endpoint, encodedBody: nil)
+    }
+
+    private func request<Response: Decodable & Sendable>(_ endpoint: APIEndpoint, encodedBody: Data?) async throws -> Response {
+        var components = URLComponents(url: baseURL.appendingPathComponent(endpoint.path), resolvingAgainstBaseURL: false)
+        if !endpoint.queryItems.isEmpty { components?.queryItems = endpoint.queryItems }
+        guard let url = components?.url else { throw APIClientError.invalidURL }
+        let effectiveTimeout = min(timeout, APIEndpointTimeoutPolicy.timeout(for: endpoint.path))
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: effectiveTimeout)
+        request.httpMethod = endpoint.method.rawValue
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
+        endpoint.headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+        if let encodedBody {
+            request.httpBody = encodedBody
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        let requestID = String(UUID().uuidString.prefix(8))
+        let feature = Self.feature(for: endpoint.path)
+        let sanitizedPath = Self.sanitizedEndpoint(path: endpoint.path, queryItems: endpoint.queryItems)
+        let startedAt = Date()
+        BotaplataLog.network.info("[\(requestID, privacy: .public)] REQUEST START \(endpoint.method.rawValue, privacy: .public) \(sanitizedPath, privacy: .public) feature=\(feature, privacy: .public) timeout=\(effectiveTimeout, privacy: .public)s auth=\(endpoint.headers["Authorization"] == nil ? "none" : "bearer", privacy: .public)")
+        let requestSignpost = BotaplataSignpost.begin("network request")
+        do {
+            let networkStartedAt = Date()
+            let (data, response) = try await session.data(for: request)
+            let networkDuration = Date().timeIntervalSince(networkStartedAt)
+            guard let http = response as? HTTPURLResponse else { throw APIClientError.network }
+            BotaplataLog.network.info("[\(requestID, privacy: .public)] RESPONSE HEADERS status=\(http.statusCode, privacy: .public) bytes=\(data.count, privacy: .public) network=\(networkDuration, privacy: .public)s")
+            if !(200..<300).contains(http.statusCode) {
+                if let envelope = try? JSONCoding.decoder.decode(APIEnvelope<EmptyResponse>.self, from: data), let payload = envelope.error { throw APIClientError.backend(statusCode: http.statusCode, error: payload, requestID: envelope.meta.requestID) }
+                throw APIClientError.httpStatus(http.statusCode, requestID: nil)
+            }
+            let decodingStartedAt = Date()
+            BotaplataLog.network.debug("[\(requestID, privacy: .public)] DECODING START dto=\(String(describing: Response.self), privacy: .public)")
+            let decodeSignpost = BotaplataSignpost.begin("JSON decoding")
+            let decoded: Response
+            do {
+                decoded = try JSONCoding.decoder.decode(Response.self, from: data)
+            } catch let decodingError as DecodingError {
+                BotaplataSignpost.end("JSON decoding", id: decodeSignpost)
+                Self.logDecodingError(decodingError, data: data, requestID: requestID, endpoint: sanitizedPath, dto: String(describing: Response.self))
+                throw decodingError
+            }
+            BotaplataSignpost.end("JSON decoding", id: decodeSignpost)
+            let decodingDuration = Date().timeIntervalSince(decodingStartedAt)
+            BotaplataLog.network.debug("[\(requestID, privacy: .public)] DECODING SUCCESS dto=\(String(describing: Response.self), privacy: .public) duration=\(decodingDuration, privacy: .public)s")
+            let total = Date().timeIntervalSince(startedAt)
+            BotaplataLog.network.info("[\(requestID, privacy: .public)] REQUEST END completed total=\(total, privacy: .public)s cache=miss authReplay=false retry=false")
+            BotaplataSignpost.end("network request", id: requestSignpost)
+            await NetworkDiagnosticsStore.shared.record(NetworkDiagnosticEntry(requestID: requestID, method: endpoint.method.rawValue, endpoint: sanitizedPath, feature: feature, startedAt: startedAt, duration: total, statusCode: http.statusCode, result: .success, cacheStatus: .miss))
+            return decoded
+        } catch is CancellationError { BotaplataSignpost.end("network request", id: requestSignpost); throw APIClientError.cancelled }
+        catch let error as APIClientError { await Self.recordFailure(error, requestID: requestID, method: endpoint.method.rawValue, endpoint: sanitizedPath, feature: feature, startedAt: startedAt, statusCode: nil); BotaplataSignpost.end("network request", id: requestSignpost); throw error }
+        catch is DecodingError { await Self.recordFailure(APIClientError.decoding, requestID: requestID, method: endpoint.method.rawValue, endpoint: sanitizedPath, feature: feature, startedAt: startedAt, statusCode: nil); BotaplataSignpost.end("network request", id: requestSignpost); throw APIClientError.decoding }
+        catch let error as URLError where error.code == .timedOut { await Self.recordFailure(APIClientError.timeout, requestID: requestID, method: endpoint.method.rawValue, endpoint: sanitizedPath, feature: feature, startedAt: startedAt, statusCode: nil); BotaplataSignpost.end("network request", id: requestSignpost); throw APIClientError.timeout }
+        catch let error as URLError where error.code == .cannotConnectToHost || error.code == .notConnectedToInternet { await Self.recordFailure(APIClientError.network, requestID: requestID, method: endpoint.method.rawValue, endpoint: sanitizedPath, feature: feature, startedAt: startedAt, statusCode: nil); BotaplataSignpost.end("network request", id: requestSignpost); throw APIClientError.network }
+        catch { await Self.recordFailure(APIClientError.network, requestID: requestID, method: endpoint.method.rawValue, endpoint: sanitizedPath, feature: feature, startedAt: startedAt, statusCode: nil); BotaplataSignpost.end("network request", id: requestSignpost); throw APIClientError.network }
+    }
+
     func send<Response: Decodable & Sendable>(_ endpoint: APIEndpoint) async throws -> Response {
         let envelope: APIEnvelope<Response> = try await sendEnvelope(endpoint)
         guard let payload = envelope.data else { throw APIClientError.decoding }

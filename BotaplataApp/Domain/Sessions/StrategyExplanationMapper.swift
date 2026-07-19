@@ -363,7 +363,7 @@ private extension StrategyExplanationMetaDTO {
             requestID: requestID,
             serverTime: serverTime,
             generatedAt: generatedAt,
-            source: source
+            source: dataSource
         )
     }
 }
