@@ -25,7 +25,7 @@ struct BotaplataApp: App {
         let isUITesting = arguments.contains("--botaplata-ui-tests")
         #if DEBUG
         let isExplicitDemo = arguments.contains("--botaplata-demo-authenticated") || ProcessInfo.processInfo.environment["BOTAPLATA_DEBUG_DEMO"] == "1"
-        let environment: AppEnvironment = isUITesting ? .uiTesting : (isExplicitDemo ? .debugPreview : .development)
+        let environment: AppEnvironment = isUITesting ? .uiTesting : (isExplicitDemo ? .debugPreview : .configuredDevelopment)
         #else
         let isExplicitDemo = false
         let environment: AppEnvironment = .production

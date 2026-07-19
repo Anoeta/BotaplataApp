@@ -9,14 +9,14 @@ final class NetworkConfigurationTests: XCTestCase {
     }
 
     func testDevelopmentRemoteURLIsBuiltExactly() throws {
-        let configuration = NetworkConfiguration(environment: .developmentRemote, baseURL: try XCTUnwrap(URL(string: "https://xxxxx.ts.net")))
+        let configuration = NetworkConfiguration(environment: .developmentRemote, baseURL: try XCTUnwrap(URL(string: "https://tyvb2rpi42tyv.taild3ac1d.ts.net")))
         XCTAssertEqual(configuration.environment, .developmentRemote)
-        XCTAssertEqual(configuration.baseURL.absoluteString, "https://xxxxx.ts.net")
+        XCTAssertEqual(configuration.baseURL.absoluteString, "https://tyvb2rpi42tyv.taild3ac1d.ts.net")
     }
 
     func testReleaseURLIsBuiltExactly() throws {
-        let configuration = NetworkConfiguration(environment: .release, baseURL: try XCTUnwrap(URL(string: "https://xxxxx.ts.net")))
+        let configuration = NetworkConfiguration(environment: .release, baseURL: try XCTUnwrap(URL(string: "https://tyvb2rpi42tyv.taild3ac1d.ts.net")))
         XCTAssertEqual(configuration.environment, .release)
-        XCTAssertEqual(configuration.baseURL.absoluteString, "https://xxxxx.ts.net")
+        XCTAssertEqual(configuration.baseURL.absoluteString, "https://tyvb2rpi42tyv.taild3ac1d.ts.net")
     }
 }

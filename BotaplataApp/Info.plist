@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BOTAPLATA_ENV</key>
+	<string>$(BOTAPLATA_ENV)</string>
+	<key>BOTAPLATA_BASE_URL</key>
+	<string>$(BOTAPLATA_BASE_URL)</string>
+	<key>BOTAPLATA_CONFIGURATION</key>
+	<string>$(CONFIGURATION)</string>
 	<key>BOTAPLATA_NETWORK_ENVIRONMENT</key>
 	<string>$(BOTAPLATA_NETWORK_ENVIRONMENT)</string>
 	<key>BOTAPLATA_DEVELOPMENT_LOCAL_BASE_URL</key>

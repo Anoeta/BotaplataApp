@@ -40,7 +40,7 @@ struct APIClient: APIClientProtocol {
         let feature = Self.feature(for: endpoint.path)
         let sanitizedPath = Self.sanitizedEndpoint(path: endpoint.path, queryItems: endpoint.queryItems)
         let startedAt = Date()
-        BotaplataLog.network.info("[\(requestID, privacy: .public)] REQUEST \(endpoint.method.rawValue, privacy: .public) \(url.absoluteString, privacy: .public) path=\(sanitizedPath, privacy: .public) feature=\(feature, privacy: .public) timeout=\(effectiveTimeout, privacy: .public)s auth=\(endpoint.headers["Authorization"] == nil ? "none" : "bearer", privacy: .public)")
+        BotaplataLog.network.info("[\(requestID, privacy: .public)] REQUEST START\n\(endpoint.method.rawValue, privacy: .public)\n\(url.absoluteString, privacy: .public) path=\(sanitizedPath, privacy: .public) feature=\(feature, privacy: .public) timeout=\(effectiveTimeout, privacy: .public)s auth=\(endpoint.headers["Authorization"] == nil ? "none" : "bearer", privacy: .public)")
         let requestSignpost = BotaplataSignpost.begin("network request")
         do {
             let networkStartedAt = Date()
@@ -119,7 +119,7 @@ struct APIClient: APIClientProtocol {
         let feature = Self.feature(for: endpoint.path)
         let sanitizedPath = Self.sanitizedEndpoint(path: endpoint.path, queryItems: endpoint.queryItems)
         let startedAt = Date()
-        BotaplataLog.network.info("[\(requestID, privacy: .public)] REQUEST \(endpoint.method.rawValue, privacy: .public) \(url.absoluteString, privacy: .public) path=\(sanitizedPath, privacy: .public) feature=\(feature, privacy: .public) timeout=\(effectiveTimeout, privacy: .public)s auth=\(endpoint.headers["Authorization"] == nil ? "none" : "bearer", privacy: .public)")
+        BotaplataLog.network.info("[\(requestID, privacy: .public)] REQUEST START\n\(endpoint.method.rawValue, privacy: .public)\n\(url.absoluteString, privacy: .public) path=\(sanitizedPath, privacy: .public) feature=\(feature, privacy: .public) timeout=\(effectiveTimeout, privacy: .public)s auth=\(endpoint.headers["Authorization"] == nil ? "none" : "bearer", privacy: .public)")
         let requestSignpost = BotaplataSignpost.begin("network request")
         do {
             let networkStartedAt = Date()
