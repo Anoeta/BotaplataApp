@@ -1,0 +1,99 @@
+{
+  "data": {
+    "session_id": "27",
+    "strategy": {
+      "id": "star_v3",
+      "code": "star_v3",
+      "label": "Star Strategy V3",
+      "version": "3"
+    },
+    "decision": {
+      "code": "data_stale",
+      "label": "Données anciennes",
+      "summary": "La session reste en sécurité en attendant des données récentes.",
+      "technical_detail": "Décision persistée, non recalculée par iOS.",
+      "status": "data_stale",
+      "decided_at": "2026-07-19T09:55:00Z"
+    },
+    "score": null,
+    "analysis": {
+      "timeframe": "5m",
+      "candle_close_time": "2026-07-19T09:50:00Z",
+      "calculated_at": "2026-07-19T09:55:00Z",
+      "next_recalculation_at": "2026-07-19T10:00:00Z",
+      "freshness": {
+        "status": "stale",
+        "label": "Ancienne",
+        "summary": "Données anciennes",
+        "is_stale": true
+      },
+      "summary": "Analyse basée sur la bougie clôturée.",
+      "technical_detail": "OHLCV clôturé."
+    },
+    "market": {
+      "regime": {
+        "code": "range",
+        "label": "Marché en range",
+        "summary": "Marché latéral."
+      },
+      "momentum": {
+        "code": "neutral",
+        "label": "Momentum neutre",
+        "summary": "Pas d’élan marqué."
+      },
+      "summary": "Contexte du marché fourni par le serveur."
+    },
+    "conditions": [
+      {
+        "id": "c1",
+        "code": "rsi",
+        "label": "RSI",
+        "status": "unfavorable",
+        "summary": "RSI fourni par le serveur.",
+        "value": "31",
+        "threshold": "seuil backend",
+        "technical_detail": "détail technique conservé"
+      },
+      {
+        "id": "c2",
+        "code": "adx",
+        "label": "ADX",
+        "status": "unfavorable",
+        "summary": "ADX fourni par le serveur.",
+        "value": "32",
+        "threshold": "seuil backend",
+        "technical_detail": "détail technique conservé"
+      },
+      {
+        "id": "c3",
+        "code": "vwap",
+        "label": "VWAP",
+        "status": "unfavorable",
+        "summary": "VWAP fourni par le serveur.",
+        "value": "33",
+        "threshold": "seuil backend",
+        "technical_detail": "détail technique conservé"
+      },
+      {
+        "id": "c4",
+        "code": "bollinger",
+        "label": "Bollinger",
+        "status": "unfavorable",
+        "summary": "Bollinger fourni par le serveur.",
+        "value": "34",
+        "threshold": "seuil backend",
+        "technical_detail": "détail technique conservé"
+      }
+    ],
+    "blockers": [],
+    "indicators": {},
+    "position_protection": null,
+    "warnings": []
+  },
+  "meta": {
+    "request_id": "r1",
+    "server_time": "2026-07-19T09:55:00Z",
+    "generated_at": "2026-07-19T09:55:00Z",
+    "source": "persisted_strategy_decision"
+  }
+}

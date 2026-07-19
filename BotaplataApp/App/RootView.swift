@@ -7,6 +7,7 @@ struct RootView: View {
     @Environment(ActiveSessionStore.self) private var activeSessionStore
     @Environment(RealSessionsStore.self) private var realSessionsStore
     @Environment(RealSessionHistoryStore.self) private var realSessionHistoryStore
+    @Environment(RealStrategyExplanationStore.self) private var strategyExplanationStore
     @Environment(ProfileStore.self) private var profileStore
     @Environment(PushNotificationsStore.self) private var pushStore
     @Environment(\.scenePhase) private var scenePhase

@@ -6,6 +6,7 @@ struct DashboardView: View {
     var openAlerts: () -> Void = {}
     var openSession: (String) -> Void = { _ in }
     var refresh: (() async -> Void)? = nil
+    @Environment(RealStrategyExplanationStore.self) private var strategyExplanationStore
 
     init(content: LoadedContent<RealActiveSnapshot>, unreadCount: Int = 0, openAlerts: @escaping () -> Void = {}, openSession: @escaping (String) -> Void = { _ in }, refresh: (() async -> Void)? = nil) {
         self.content = content
@@ -102,6 +103,7 @@ struct DashboardView: View {
             if let session = snapshot.activeSession {
                 DashboardSessionCard(session: session, activeSessionCount: snapshot.activeSessionCount, openSession: openSession)
                 DecisionSummaryCard(session: session)
+                DashboardStrategyExplanationCard(session: session, store: strategyExplanationStore, openSession: openSession)
                 StrategyConditionsCard(decision: session.decision)
                 PositionCard(session: session)
                 ReconciliationCard(session: session)
@@ -230,3 +232,17 @@ extension DashboardPresentation {
 #Preview("Dashboard ordre pending") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuyFill, warnings: [], requestID: nil, serverTime: nil))) } }
 #Preview("Dashboard réconciliation") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.reconciliationDetail, warnings: [], requestID: nil, serverTime: nil))) } }
 #Preview("Dashboard données anciennes") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.staleDetail, warnings: PreviewFixtures.staleDetail.warnings, requestID: nil, serverTime: nil))) } }
+
+
+private struct DashboardStrategyExplanationCard: View {
+    let session: SessionDetail
+    @Bindable var store: RealStrategyExplanationStore
+    let openSession: (String) -> Void
+    var body: some View {
+        Group {
+            if let e = store.explanation, e.sessionID == session.id {
+                PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Décision actuelle").font(BotaplataTypography.cardTitle); Text(e.decision.label).font(.headline); Text(e.decision.summary).foregroundStyle(BotaplataColors.textSecondary); if let score = e.score { PremiumKeyValueRow(label: "Conditions", value: "\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—") conditions", monospaced: true) }; if let close = e.analysis.candleCloseTime { Text("Analyse basée sur la bougie clôturée à \(DashboardPresentation.time(close))").font(.caption).foregroundStyle(BotaplataColors.textMuted) }; if let next = e.analysis.nextRecalculationAt { Text("Prochaine actualisation : \(DashboardPresentation.time(next))").font(.caption).foregroundStyle(BotaplataColors.textMuted) }; if let blocker = e.blockers.first { Text(blocker.summary).font(.caption).foregroundStyle(BotaplataColors.warning) }; PremiumSecondaryButton(title: "Comprendre la décision") { openSession(session.id) } } }
+            } else if store.isLoading { PremiumSkeletonCard() }
+        }.task { await store.load(sessionID: session.id, reason: "dashboardActiveSession") }
+    }
+}
