@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 actor AuthenticationSession {
     private let repository: AuthenticationRepository

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 protocol AppClock: Sendable { func sleep(seconds: TimeInterval) async throws }
 struct SystemAppClock: AppClock { func sleep(seconds: TimeInterval) async throws { try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000)) } }

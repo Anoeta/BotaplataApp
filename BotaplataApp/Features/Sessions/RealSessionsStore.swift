@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 @MainActor @Observable final class RealSessionsStore {
     var content: LoadedContent<[SessionSummary]> = .idle
