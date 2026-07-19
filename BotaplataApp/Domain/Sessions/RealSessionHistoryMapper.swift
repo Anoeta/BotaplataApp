@@ -1,5 +1,7 @@
 import Foundation
-
+import Observation
+ 
+import OSLog
 extension TimelinePageDTO { func mapped(warnings: [APIWarning], serverTime: Date?) -> TimelinePage { TimelinePage(items: items.map { $0.mapped() }, pagination: RealSessionsPagination(page: pagination.page, pageSize: pagination.pageSize, total: pagination.total, hasMore: pagination.hasMore), warnings: warnings.map(Warning.init(api:)), serverTime: serverTime) } }
 extension TimelineEventDTO { func mapped() -> TimelineEvent { TimelineEvent(id: id, occurredAt: occurredAt, type: TimelineEventType(rawValue: type ?? "") ?? .unknown, severity: TimelineSeverity(rawValue: severity ?? "") ?? .neutral, title: title ?? "Information Botaplata", message: message ?? "Un événement a été enregistré pour cette session.", relatedOrderID: relatedOrderID, relatedPositionID: relatedPositionID, money: money?.mapped()) } }
 extension TimelineMoneyDTO { func mapped() -> TimelineMoney { TimelineMoney(amountQuote: amountQuote.money(currency ?? "USDC")) } }

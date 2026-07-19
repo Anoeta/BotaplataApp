@@ -1,4 +1,6 @@
 import Foundation
+import Observation
+import OSLog
 
 struct DeviceRevocationResult: Codable, Equatable, Sendable {
     let revokedDeviceID: String

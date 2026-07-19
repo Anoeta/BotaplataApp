@@ -1,4 +1,6 @@
 import Foundation
+import OSLog
+import Observation
 
 struct RealSessionsPage: Equatable, Sendable, Codable { let items: [SessionSummary]; let pagination: RealSessionsPagination; let warnings: [Warning]; let serverTime: Date? }
 struct RealSessionsPagination: Equatable, Sendable, Codable { let page: Int; let pageSize: Int; let total: Int; let hasMore: Bool }
