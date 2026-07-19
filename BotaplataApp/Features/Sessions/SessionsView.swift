@@ -543,7 +543,7 @@ extension NotificationNavigationTarget.Section {
 #Preview("Détail SELL pending") { NavigationStack { SessionDetailView(session: PreviewFixtures.sellPending) } }
 #Preview("Détail fee-aware complet") { NavigationStack { SessionDetailView(session: PreviewFixtures.krakenDetail) } }
 #Preview("Détail données anciennes") { NavigationStack { SessionDetailView(session: PreviewFixtures.staleDetail) } }
-#Preview("Graphique sans série") { NavigationStack { ChartContent(chart: PreviewFixtures.sessionChart) } }
+#Preview("Graphique sans série") { NavigationStack { SessionHistoryChartContent(chart: PreviewFixtures.sessionChart) } }
 #Preview("Session overview waiting buy") { NavigationStack { SessionDetailView(session: PreviewFixtures.waitingBuyWithConditions) } }
 #Preview("Session overview position ouverte") { NavigationStack { SessionDetailView(session: PreviewFixtures.krakenDetail) } }
 #Preview("Session overview ordre pending") { NavigationStack { SessionDetailView(session: PreviewFixtures.waitingBuyFill) } }
