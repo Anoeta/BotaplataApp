@@ -117,7 +117,21 @@ extension RealStrategyExplanationDataDTO {
   }
 
   private func mapIndicators() -> StrategyIndicatorSet {
-    indicators.mapped()
+    let rsiCondition = conditions.first { $0.code == "rsi" }
+    let rsiSource: String
+    if indicators.rsi?.value != nil {
+      rsiSource = "indicators"
+    } else if rsiCondition?.value != nil {
+      rsiSource = "condition"
+    } else {
+      rsiSource = "none"
+    }
+    BotaplataLog.strategyExplanation.debug(
+      "StrategyExplanationMapper indicators rsiPresent=\(indicators.rsi?.value != nil, privacy: .public) adxPresent=\(indicators.adx?.value != nil, privacy: .public) atrPresent=\(indicators.atr?.value != nil, privacy: .public)"
+    )
+    BotaplataLog.strategyExplanation.debug("StrategyExplanationMapper rsiSource=\(rsiSource, privacy: .public)")
+    BotaplataLog.strategyExplanation.debug("StrategyExplanationMapper rsiConditionValuePresent=\(rsiCondition?.value != nil, privacy: .public)")
+    return indicators.mapped(rsiCondition: rsiCondition)
   }
 
   private func mapPositionProtection() -> StrategyPositionProtection? {
@@ -209,11 +223,13 @@ extension StrategyExplanationBlockerDTO {
 }
 
 extension StrategyExplanationIndicatorsDTO {
-  fileprivate func mapped() -> StrategyIndicatorSet {
+  fileprivate func mapped(rsiCondition: StrategyExplanationConditionDTO? = nil) -> StrategyIndicatorSet {
     var result: [StrategyIndicator] = []
 
     if let rsi {
       result.append(rsi.mappedAsRSI())
+    } else if let rsiCondition, let value = rsiCondition.value {
+      result.append(StrategyExplanationIndicatorDTO(value: value, label: rsiCondition.label, status: rsiCondition.status, summary: rsiCondition.summary, technicalDetail: rsiCondition.technicalDetail).mappedAsRSI())
     }
 
     if let adx {

@@ -72,3 +72,17 @@ final class ContractAlignmentTests: XCTestCase {
     }
 
 }
+
+extension ContractAlignmentTests {
+    func testSessionDetailConditionValueNullDecodes() throws {
+        let json = #"{"id":"session-27","display_symbol":"SOL/USDC","provider":"kraken","lifecycle_state":"waiting_buy","freshness":{"status":"fresh"},"decision":{"buy_conditions":[{"code":"rsi","label":"RSI","status":"pending","value":null}],"sell_conditions":[]}}"#
+        let dto = try JSONCoding.decoder.decode(RealSessionDetailDTO.self, from: Data(json.utf8))
+        XCTAssertNil(dto.decision?.buyConditions.first?.value)
+    }
+
+    func testActiveSnapshotConditionValueNullDecodes() throws {
+        let json = #"{"generated_at":"2026-07-19T12:30:00Z","active_session_count":1,"active_session":{"id":"session-27","display_symbol":"SOL/USDC","provider":"kraken","lifecycle_state":"waiting_buy","freshness":{"status":"fresh"},"decision":{"buy_conditions":[{"code":"rsi","label":"RSI","status":"pending","value":null}],"sell_conditions":[]}}}"#
+        let dto = try JSONCoding.decoder.decode(RealActiveSnapshotDTO.self, from: Data(json.utf8))
+        XCTAssertNil(dto.activeSession?.decision?.buyConditions.first?.value)
+    }
+}

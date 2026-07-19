@@ -146,8 +146,8 @@ struct StrategyExplanationConditionDTO: Decodable, Sendable {
     code = try c.decodeIfPresent(String.self, forKey: .code) ?? c.decode(String.self, forKey: .id)
     label = try c.decode(String.self, forKey: .label)
     status = try c.decode(String.self, forKey: .status)
-    value = try c.decodeIfPresent(String.self, forKey: .value)
-    threshold = try c.decodeIfPresent(String.self, forKey: .threshold)
+    value = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .value)?.value
+    threshold = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .threshold)?.value
     summary = try c.decodeIfPresent(String.self, forKey: .summary)
     technicalDetail = try c.decodeIfPresent(String.self, forKey: .technicalDetail)
     importance = try c.decodeIfPresent(String.self, forKey: .importance)
@@ -200,6 +200,30 @@ struct StrategyExplanationIndicatorDTO: Decodable, Sendable {
   enum CodingKeys: String, CodingKey {
     case value, label, status, summary
     case technicalDetail = "technical_detail"
+  }
+
+  init(value: String?, label: String?, status: String?, summary: String?, technicalDetail: String?) {
+    self.value = value
+    self.label = label
+    self.status = status
+    self.summary = summary
+    self.technicalDetail = technicalDetail
+  }
+
+  init(from decoder: Decoder) throws {
+    if let c = try? decoder.container(keyedBy: CodingKeys.self) {
+      value = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .value)?.value
+      label = try c.decodeIfPresent(String.self, forKey: .label)
+      status = try c.decodeIfPresent(String.self, forKey: .status)
+      summary = try c.decodeIfPresent(String.self, forKey: .summary)
+      technicalDetail = try c.decodeIfPresent(String.self, forKey: .technicalDetail)
+    } else {
+      value = try FlexibleStringValueDTO(from: decoder).value
+      label = nil
+      status = nil
+      summary = nil
+      technicalDetail = nil
+    }
   }
 }
 struct StrategyExplanationPositionProtectionDTO: Decodable, Sendable {

@@ -771,7 +771,8 @@ struct StrategyIndicatorsCard: View {
                     Text("Indicateurs utilisés").font(BotaplataTypography.cardTitle)
                     ForEach(indicators) { i in
                         VStack(alignment: .leading, spacing: 4) {
-                            PremiumKeyValueRow(label: i.name, value: i.valueRaw ?? "Indisponible", monospaced: true)
+                            PremiumKeyValueRow(label: i.name, value: i.displayValue, monospaced: true)
+                            if let statusText = i.displayStatusText { Text(statusText).font(.caption).foregroundStyle(BotaplataColors.textSecondary) }
                             Text(i.help).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
                             if let d = i.technicalDetail {
                                 DisclosureGroup("Détail technique") {
@@ -864,4 +865,16 @@ struct StrategyTechnicalDetailsCard: View {
             }
         }
     }
+}
+
+
+extension StrategyIndicator {
+    fileprivate var displayValue: String {
+        if id == "rsi", let raw = valueRaw?.replacingOccurrences(of: ",", with: "."), let decimal = Decimal(string: raw, locale: Locale(identifier: "en_US_POSIX")) {
+            let formatter = NumberFormatter(); formatter.locale = Locale(identifier: "fr_FR"); formatter.minimumFractionDigits = 1; formatter.maximumFractionDigits = 1
+            return formatter.string(from: decimal as NSDecimalNumber) ?? valueRaw ?? "Indisponible"
+        }
+        return valueRaw ?? "Indisponible"
+    }
+    fileprivate var displayStatusText: String? { id == "rsi" && status != "favorable" ? "À confirmer" : nil }
 }
