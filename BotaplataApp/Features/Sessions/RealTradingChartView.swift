@@ -463,9 +463,9 @@ struct CandlestickChart: View {
             RuleMark(
                 x: .value("Date", candle.openTime),
                 yStart: .value("Bas", candle.low),
-                yEnd: .value("Haut", candle.high),
-                width: .fixed(max(1, min(2, candleWidth * 0.35)))
+                yEnd: .value("Haut", candle.high)
             )
+            .lineStyle(StrokeStyle(lineWidth: max(1, min(2, candleWidth * 0.35))))
             .foregroundStyle(candleColor(for: candle))
 
             RectangleMark(
@@ -981,3 +981,4 @@ private extension TradingChart {
     RealTradingChartView(state: .loaded(PreviewFixtures.tradingChart(range: .sevenDays).withPreviewCandles(count: 672, range: .sevenDays)), selectedRange: .sevenDays, select: { _ in }, refresh: {})
 }
 #endif
+

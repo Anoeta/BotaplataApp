@@ -1,4 +1,6 @@
 import Foundation
+import Observation
+import OSLog
 
 protocol RealSessionChartRepositoryProtocol: Sendable { func fetchChart(sessionID: String, range: TradingChartRange, before: Date?, limit: Int?, accessToken: String) async throws -> TradingChart }
 

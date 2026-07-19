@@ -1,6 +1,7 @@
 import Foundation
 import Observation
-
+ 
+import OSLog
 enum RealStrategyExplanationState: Sendable { case idle, loading, loaded, refreshing, offlineCached, empty, error(String) }
 
 @MainActor @Observable final class RealStrategyExplanationStore {

@@ -1,4 +1,6 @@
 import Foundation
+import Observation
+import OSLog
 
 protocol RealStrategyExplanationRepository: Sendable { func fetchStrategyExplanation(sessionID: String, accessToken: String) async throws -> StrategyExplanation }
 struct RemoteRealStrategyExplanationRepository: RealStrategyExplanationRepository { let client: APIClientProtocol

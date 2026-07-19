@@ -1,6 +1,7 @@
 import Foundation
 import Observation
-
+ 
+import OSLog
 struct TradingChartCacheKey: Hashable { let sessionID: String; let range: TradingChartRange }
 struct TradingChartCacheEntry { let chart: TradingChart; let fetchedAt: Date }
 enum ChartPresentationError: Equatable { case networkUnavailable, serverUnavailable, authenticationExpired, deviceRevoked, decodingFailed, contractIncompatible, unknown; var title: String { switch self { case .networkUnavailable: "Impossible de charger le graphique"; case .contractIncompatible: "Réponse du serveur incompatible"; default: "Graphique indisponible" } }; var message: String { switch self { case .networkUnavailable: "Vérifiez la connexion au serveur Botaplata."; case .contractIncompatible: "Vérifiez que le serveur et l’application Botaplata sont à jour."; default: "Réessayez dans quelques instants." } } }

@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import OSLog
 
 extension RealStrategyExplanationDTO { func mapped() -> StrategyExplanation { data.mapped(metaDTO: meta) } }
