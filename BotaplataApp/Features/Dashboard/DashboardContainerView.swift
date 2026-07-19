@@ -11,9 +11,9 @@ struct DashboardContainerView: View {
             unreadCount: pushStore.unreadCount,
             openAlerts: { router.selectedTab = .dashboard; router.dashboardPath.append("alerts") },
             openSession: { id in router.selectedTab = .sessions; router.sessionsPath.append(SessionRoute.detail(id: id, section: .overview)) },
-            refresh: { await store.refresh() }
+            refresh: { await store.refresh(reason: .manualRefresh, force: true) }
         )
-        .task { store.start(); await pushStore.bootstrap() }
+        .task { store.start() }
         .navigationDestination(for: String.self) { route in if route == "alerts" { AlertsCenterView(store: pushStore) } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { store.enterBackground() } else if phase == .active { store.enterForeground() } }
     }

@@ -26,6 +26,7 @@ final class PushNotificationsStore {
     private var loadTask: Task<Void, Never>?
     private var generation = 0
     private var lastPreferencesLoadAt: Date?
+    private var didBootstrap = false
     private let preferencesCacheTTL: TimeInterval = 60
 
     init(repository: PushNotificationsRepository, permissionManager: PushNotificationPermissionManaging, cache: PushNotificationsCache, authSession: AuthenticationSession, appState: AppState, badgeManager: AppBadgeManaging = AppBadgeManager()) {
@@ -40,6 +41,8 @@ final class PushNotificationsStore {
     var unreadCount: Int { self.summary?.unreadCount ?? 0 }
 
     func bootstrap() async {
+        if didBootstrap { BotaplataLog.network.debug("PushPreferencesStore.load skipped reason=alreadyBootstrapped"); return }
+        didBootstrap = true
         BotaplataLog.network.debug("PushPreferencesStore.load reason=bootstrap")
         self.permissionStatus = await self.permissionManager.authorizationStatus()
         if let cached = await self.cache.load() {
@@ -52,7 +55,7 @@ final class PushNotificationsStore {
     }
 
     func refreshAll(reason: String = "refresh", force: Bool = false) async {
-        BotaplataLog.network.debug("PushPreferencesStore.load reason=\(reason, privacy: .public)")
+        if reason != "bootstrap" { BotaplataLog.network.debug("PushPreferencesStore.load reason=\(reason, privacy: .public)") }
         if self.loadTask != nil { BotaplataLog.network.debug("PushPreferencesStore.load skipped reason=singleFlight"); return }
         if !force, let lastPreferencesLoadAt, Date().timeIntervalSince(lastPreferencesLoadAt) < preferencesCacheTTL { BotaplataLog.network.debug("PushPreferencesStore.load skipped reason=freshCache"); return }
         let nextGeneration = self.generation + 1

@@ -12,4 +12,26 @@ final class RealSessionHistoryDTOTests: XCTestCase {
         let chart = try JSONCoding.decoder.decode(SessionChartDTO.self, from: Data(#"{"session_id":"s1","symbol":"SOLUSDC","display_symbol":"SOL/USDC","quote_asset":"USDC","timeframe":"1m","points":[],"markers":[{"id":"m1","timestamp":"2026-07-13T13:18:00Z","type":"buy","label":"Achat confirmé","price":"77.74","quantity":"10.29071263","quote_amount":"799.99"}],"levels":{"execution_price":"77.74","cost_basis_price":"78.36","break_even_price":"78.98","minimum_profitable_exit_price":"79.10"}}"#.utf8)).mapped(warnings: [APIWarning(code: "chart_price_series_unavailable", message: "technical")], serverTime: nil)
         XCTAssertTrue(chart.points.isEmpty); XCTAssertEqual(chart.markers[0].type, .buy); XCTAssertEqual(chart.levels.breakEvenPrice?.value, Decimal(string: "78.98")); XCTAssertEqual(chart.warnings[0].id, "chart_price_series_unavailable")
     }
+    func testDecisionConditionsFilterNullsAndEmptyStrings() throws {
+        let json = #"{"items":[{"id":"d1","created_at":"2026-07-13T13:18:00Z","buy_conditions":[null,"RSI non validé","","Prix sous VWAP"],"sell_conditions":[],"blockers":[]}],"pagination":{"page":1,"page_size":50,"total":1,"has_more":false}}"#
+        let page = try JSONCoding.decoder.decode(DecisionsPageDTO.self, from: Data(json.utf8))
+        XCTAssertEqual(page.items[0].buyConditions, ["RSI non validé", "Prix sous VWAP"])
+    }
+
+    func testDecisionConditionArraysAcceptNormalEmptyAndAbsentFields() throws {
+        let json = #"{"items":[{"id":"d1","created_at":"2026-07-13T13:18:00Z","buy_conditions":["A"],"sell_conditions":[],"blockers":[null,"B"]},{"id":"d2","created_at":"2026-07-13T13:19:00Z"}],"pagination":{"page":1,"page_size":50,"total":2,"has_more":false}}"#
+        let page = try JSONCoding.decoder.decode(DecisionsPageDTO.self, from: Data(json.utf8))
+        XCTAssertEqual(page.items[0].buyConditions, ["A"])
+        XCTAssertEqual(page.items[0].sellConditions, [])
+        XCTAssertEqual(page.items[0].blockers, ["B"])
+        XCTAssertNil(page.items[1].buyConditions)
+    }
+
+    func testDecisionConditionsRejectInvalidTypes() throws {
+        for bad in ["1", "{}", "true", "[]"] {
+            let json = "{\"items\":[{\"id\":\"d1\",\"created_at\":\"2026-07-13T13:18:00Z\",\"buy_conditions\":[\(bad)]}],\"pagination\":{\"page\":1,\"page_size\":50,\"total\":1,\"has_more\":false}}"
+            XCTAssertThrowsError(try JSONCoding.decoder.decode(DecisionsPageDTO.self, from: Data(json.utf8)))
+        }
+    }
+
 }
