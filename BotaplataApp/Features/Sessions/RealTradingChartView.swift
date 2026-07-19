@@ -210,7 +210,7 @@ enum TradingChartPresentation {
             ("trailingStop", "Trailing stop", levels.trailingStopPrice)
         ]
         .compactMap { id, title, value in
-            value.map { ChartRenderableLevel(id: id, title: title, price: dbl($0), offset: 0) }
+            value.flatMap { $0 == 0 ? nil : ChartRenderableLevel(id: id, title: title, price: dbl($0), offset: 0) }
         }
         .enumerated()
         .map { index, level in
