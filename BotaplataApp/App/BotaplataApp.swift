@@ -12,6 +12,7 @@ struct BotaplataApp: App {
     @State private var realSessionsStore: RealSessionsStore
     @State private var realSessionHistoryStore: RealSessionHistoryStore
     @State private var realSessionChartStore: RealSessionChartStore
+    @State private var strategyExplanationStore: RealStrategyExplanationStore
     @State private var profileStore: ProfileStore
     @State private var pushStore: PushNotificationsStore
     @StateObject private var pushBridge = PushNotificationEventBridge()
@@ -38,6 +39,7 @@ struct BotaplataApp: App {
         let sessionsRepository: RealSessionsRepository = usesFixtures ? MockRealSessionsRepository() : BotaplataApp.makeSessionsRepository(environment: environment)
         let historyRepository: RealSessionHistoryRepository = usesFixtures ? MockRealSessionHistoryRepository() : BotaplataApp.makeHistoryRepository(environment: environment)
         let chartRepository: RealSessionChartRepositoryProtocol = usesFixtures ? MockRealSessionChartRepository() : BotaplataApp.makeChartRepository(environment: environment)
+        let strategyRepository: RealStrategyExplanationRepository = usesFixtures ? MockRealStrategyExplanationRepository() : BotaplataApp.makeStrategyExplanationRepository(environment: environment)
         let pushRepository: PushNotificationsRepository = usesFixtures ? MockPushNotificationsRepository() : BotaplataApp.makePushRepository(environment: environment)
         _appState = State(initialValue: state)
         _authStore = State(initialValue: auth)
@@ -45,6 +47,7 @@ struct BotaplataApp: App {
         _realSessionsStore = State(initialValue: RealSessionsStore(repository: sessionsRepository, cache: FileRealSessionsCache(), authSession: auth.session, appState: state))
         _realSessionHistoryStore = State(initialValue: RealSessionHistoryStore(repository: historyRepository, cache: FileRealSessionHistoryCache(), authSession: auth.session, appState: state))
         _realSessionChartStore = State(initialValue: RealSessionChartStore(repository: chartRepository, authSession: auth.session))
+        _strategyExplanationStore = State(initialValue: RealStrategyExplanationStore(repository: strategyRepository, authSession: auth.session, appState: state))
         _profileStore = State(initialValue: ProfileStore(authSession: auth.session, appState: state, authenticator: LocalAuthenticationBiometricAuthenticator(), preferences: UserDefaultsSecurityPreferencesStore()))
         _pushStore = State(initialValue: PushNotificationsStore(repository: pushRepository, permissionManager: PushNotificationPermissionManager(), cache: FilePushNotificationsCache(), authSession: auth.session, appState: state))
     }
@@ -74,12 +77,17 @@ struct BotaplataApp: App {
         return RealSessionChartRepository(client: APIClient(baseURL: baseURL))
     }
 
+    static func makeStrategyExplanationRepository(environment: AppEnvironment) -> RealStrategyExplanationRepository {
+        guard let baseURL = environment.baseURL else { return UnconfiguredRealStrategyExplanationRepository() }
+        return RemoteRealStrategyExplanationRepository(client: APIClient(baseURL: baseURL))
+    }
+
     static func makePushRepository(environment: AppEnvironment) -> PushNotificationsRepository {
         guard let baseURL = environment.baseURL else { return UnconfiguredPushNotificationsRepository() }
         return RemotePushNotificationsRepository(client: APIClient(baseURL: baseURL))
     }
 
     var body: some Scene {
-        WindowGroup { RootView().preferredColorScheme(.dark).environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).environment(realSessionChartStore).environment(profileStore).environment(pushStore).task { BotaplataAppDelegate.bridge = pushBridge; pushBridge.onDeviceToken = { token in Task { await pushStore.registerDeviceToken(token) } }; pushBridge.onForeground = { Task { await pushStore.refreshAll(force: true) } }; pushBridge.onNotificationTap = { target, id in Task { await pushStore.handleNotificationTap(target: target, notificationID: id, router: router) } }; if appState.sessionState == .unknown { await authStore.restore() } } }
+        WindowGroup { RootView().preferredColorScheme(.dark).environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).environment(realSessionChartStore).environment(strategyExplanationStore).environment(profileStore).environment(pushStore).task { BotaplataAppDelegate.bridge = pushBridge; pushBridge.onDeviceToken = { token in Task { await pushStore.registerDeviceToken(token) } }; pushBridge.onForeground = { Task { await pushStore.refreshAll(force: true) } }; pushBridge.onNotificationTap = { target, id in Task { await pushStore.handleNotificationTap(target: target, notificationID: id, router: router) } }; if appState.sessionState == .unknown { await authStore.restore() } } }
     }
 }
