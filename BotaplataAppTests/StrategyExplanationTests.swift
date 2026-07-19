@@ -7,7 +7,10 @@ final class StrategyExplanationTests: XCTestCase {
         for name in fixtures {
             let dto = try fixture(name)
             let model = dto.mapped()
+            XCTAssertEqual(dto.data.strategy.code, "star_v3")
+            XCTAssertEqual(dto.data.strategy.name, "Star Strategy V3")
             XCTAssertEqual(model.strategy.code, "star_v3")
+            XCTAssertEqual(model.strategy.name, "Star Strategy V3")
             XCTAssertFalse(model.decision.label.isEmpty)
             XCTAssertEqual(model.meta.source, "persisted_strategy_decision")
             XCTAssertEqual(model.conditions.count, 4)
@@ -21,16 +24,29 @@ final class StrategyExplanationTests: XCTestCase {
         let dto = try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: data)
 
         XCTAssertEqual(dto.data.sessionID, "27")
+        XCTAssertEqual(dto.data.strategy.code, "star_v3")
+        XCTAssertEqual(dto.data.strategy.name, "Star Strategy V3")
         XCTAssertEqual(dto.meta.dataSource, "persisted_strategy_decision")
     }
 
     func testRejectsLegacyDoubleEnvelopeContract() throws {
-        let data = #"{"data":{"data":{"session_id":"27","strategy":{"id":"star_v3"},"decision":{"code":"wait","label":"Attente","summary":"Résumé"},"analysis":{"freshness":{"status":"fresh","is_stale":false}},"market":{"regime":{"code":"range","label":"Range"},"momentum":{"code":"neutral","label":"Neutre"}},"conditions":[],"blockers":[],"indicators":{},"warnings":[]},"meta":{"data_source":"persisted_strategy_decision"}},"meta":{"data_source":"outer"}}"#.data(using: .utf8)!
+        let data = #"{"data":{"data":{"session_id":"27","strategy":{"code":"star_v3","name":"Star Strategy V3"},"decision":{"code":"wait","label":"Attente","summary":"Résumé"},"analysis":{"freshness":{"status":"fresh","is_stale":false}},"market":{"regime":{"code":"range","label":"Range"},"momentum":{"code":"neutral","label":"Neutre"}},"conditions":[],"blockers":[],"indicators":{},"warnings":[]},"meta":{"data_source":"persisted_strategy_decision"}},"meta":{"data_source":"outer"}}"#.data(using: .utf8)!
 
         XCTAssertThrowsError(try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: data))
     }
+
+    func testStrategyIdentityDecodesWithoutLegacyID() throws {
+        let json = #"{"data":{"session_id":"27","strategy":{"code":"star_v3","name":"Star Strategy V3","version":"3"},"decision":{"code":"wait","label":"Attente","summary":"Résumé"},"analysis":{"freshness":{"status":"fresh","is_stale":false}},"market":{"regime":{"code":"range","label":"Range"},"momentum":{"code":"neutral","label":"Neutre"}},"conditions":[],"blockers":[],"indicators":{},"warnings":[]},"meta":{"data_source":"persisted_strategy_decision"}}"#.data(using: .utf8)!
+        let dto = try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: json)
+        let model = dto.mapped()
+
+        XCTAssertEqual(dto.data.strategy.code, "star_v3")
+        XCTAssertEqual(dto.data.strategy.name, "Star Strategy V3")
+        XCTAssertEqual(model.strategy.code, "star_v3")
+        XCTAssertEqual(model.strategy.name, "Star Strategy V3")
+    }
     func testUnknownEnumsFallbackWithoutFailingDecode() throws {
-        let json = #"{"data":{"session_id":"x","strategy":{"id":"s"},"decision":{"code":"new_decision","label":"Nouveau","summary":"Résumé"},"analysis":{"freshness":{"status":"fresh","is_stale":false}},"market":{"regime":{"code":"new_regime","label":"R"},"momentum":{"code":"new_momentum","label":"M"}},"conditions":[{"id":"c","label":"C","status":"new_status","summary":"S"}],"blockers":[{"id":"b","label":"B","summary":"S","severity":"new_severity"}],"indicators":{},"warnings":[]},"meta":{}}"#.data(using: .utf8)!
+        let json = #"{"data":{"session_id":"x","strategy":{"code":"s","name":"Strategy S"},"decision":{"code":"new_decision","label":"Nouveau","summary":"Résumé"},"analysis":{"freshness":{"status":"fresh","is_stale":false}},"market":{"regime":{"code":"new_regime","label":"R"},"momentum":{"code":"new_momentum","label":"M"}},"conditions":[{"id":"c","label":"C","status":"new_status","summary":"S"}],"blockers":[{"id":"b","label":"B","summary":"S","severity":"new_severity"}],"indicators":{},"warnings":[]},"meta":{}}"#.data(using: .utf8)!
         let model = try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: json).mapped()
         XCTAssertEqual(model.decision.code, .unknown)
         XCTAssertEqual(model.market.regime.code, .unknown)

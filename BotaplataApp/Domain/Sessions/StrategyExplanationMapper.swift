@@ -40,13 +40,9 @@ extension RealStrategyExplanationDataDTO {
     }
 
     private func mapStrategy() -> StrategyIdentity {
-        let code: String = strategy.code ?? strategy.id
-        let label: String = strategy.label ?? strategy.code ?? strategy.id
-
-        return StrategyIdentity(
-            id: strategy.id,
-            code: code,
-            label: label,
+        StrategyIdentity(
+            code: strategy.code,
+            name: strategy.name,
             version: strategy.version
         )
     }

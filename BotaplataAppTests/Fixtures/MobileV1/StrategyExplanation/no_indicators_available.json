@@ -2,9 +2,8 @@
   "data": {
     "session_id": "27",
     "strategy": {
-      "id": "star_v3",
       "code": "star_v3",
-      "label": "Star Strategy V3",
+      "name": "Star Strategy V3",
       "version": "3"
     },
     "decision": {
