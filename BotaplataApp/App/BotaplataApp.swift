@@ -54,6 +54,7 @@ struct BotaplataApp: App {
 
     static func makeRepository(environment: AppEnvironment) -> AuthenticationRepository {
         guard let baseURL = environment.baseURL else { return UnconfiguredAuthenticationRepository() }
+        environment.networkConfiguration?.logResolvedConfiguration()
         return RemoteAuthenticationRepository(client: APIClient(baseURL: baseURL))
     }
 

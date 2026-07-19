@@ -15,7 +15,7 @@
 - Version marketing : `1.0`.
 - Build number actuel : `1`.
 - Entitlement push : `aps-environment` présent. Adapter `development`/`production` via la configuration Apple/Xcode au moment de l'archive.
-- `BOTAPLATA_API_BASE_URL=<À_CONFIGURER>` défini pour TestFlight.
+- `BOTAPLATA_NETWORK_ENVIRONMENT + environment-specific base URL=<À_CONFIGURER>` défini pour TestFlight.
 
 ## Archive et upload
 
