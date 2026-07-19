@@ -77,7 +77,7 @@ struct APIClient: APIClientProtocol {
             }
             BotaplataSignpost.end("JSON decoding", id: decodeSignpost)
             let decodingDuration = Date().timeIntervalSince(decodingStartedAt)
-            BotaplataLog.network.debug("[\(requestID, privacy: .public)] DECODING SUCCESS duration=\(decodingDuration, privacy: .public)s")
+            BotaplataLog.network.debug("[\(requestID, privacy: .public)] DECODING SUCCESS dto=\(String(describing: Response.self), privacy: .public) duration=\(decodingDuration, privacy: .public)s")
             guard envelope.version == "mobile_v1" else { throw APIClientError.invalidVersion(envelope.version) }
             if envelope.ok, (200..<300).contains(http.statusCode) {
                 let total = Date().timeIntervalSince(startedAt)

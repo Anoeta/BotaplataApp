@@ -13,12 +13,31 @@ struct DeviceRevocationResult: Codable, Equatable, Sendable {
 struct AuthorizedDevicesResponseDTO: Decodable, Sendable {
     let devices: [AuthorizedDevice]
     let currentDeviceID: String?
-    enum CodingKeys: String, CodingKey { case devices; case currentDeviceID = "current_device_id" }
-    var mappedDevices: [AuthorizedDevice] {
-        guard let currentDeviceID else { return devices }
-        return devices.map { device in
-            AuthorizedDevice(id: device.id, name: device.name, model: device.model, osVersion: device.osVersion, appVersion: device.appVersion, locale: device.locale, createdAt: device.createdAt, lastSeenAt: device.lastSeenAt, lastAuthenticatedAt: device.lastAuthenticatedAt, isCurrent: device.isCurrent || device.id == currentDeviceID, isRevoked: device.isRevoked)
+    enum CodingKeys: String, CodingKey { case items, devices; case currentDeviceID = "current_device_id" }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let items = try c.decodeIfPresent([AuthorizedDevice].self, forKey: .items) {
+            devices = items
+        } else {
+            devices = try c.decode([AuthorizedDevice].self, forKey: .devices)
         }
+        currentDeviceID = try c.decodeIfPresent(String.self, forKey: .currentDeviceID)
+    }
+
+    var mappedDevices: [AuthorizedDevice] {
+        let mapped: [AuthorizedDevice]
+        if let currentDeviceID {
+            mapped = devices.map { device in
+                AuthorizedDevice(id: device.id, name: device.name, model: device.model, osVersion: device.osVersion, appVersion: device.appVersion, locale: device.locale, createdAt: device.createdAt, lastSeenAt: device.lastSeenAt, lastAuthenticatedAt: device.lastAuthenticatedAt, isCurrent: device.isCurrent || device.id == currentDeviceID, isRevoked: device.isRevoked)
+            }
+        } else {
+            mapped = devices
+        }
+        let current = mapped.filter(\.isCurrent).count
+        let revoked = mapped.filter(\.isRevoked).count
+        BotaplataLog.auth.info("AuthorizedDevicesMapper devices=\(mapped.count, privacy: .public) current=\(current, privacy: .public) revoked=\(revoked, privacy: .public)")
+        return mapped
     }
 }
 

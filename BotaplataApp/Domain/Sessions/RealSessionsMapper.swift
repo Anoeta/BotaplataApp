@@ -25,6 +25,8 @@ private func quoteAsset(from pair: String?) -> String? { pair?.split(separator: 
 extension RealDecisionDTO {
     func mapped(currency: String = "USDC", lifecycle: SessionLifecycleState = .unknown) -> StrategyDecisionSummary {
         let fallback = DashboardPresentation.wording(for: lifecycle)
+        let nullValues = buyConditions.filter { $0.value == nil }.count + sellConditions.filter { $0.value == nil }.count
+        BotaplataLog.sessions.info("DecisionMapper buyConditions=\(self.buyConditions.count, privacy: .public) nullValues=\(nullValues, privacy: .public)")
         return StrategyDecisionSummary(
             title: title ?? decision.map(Self.localTitle(for:)) ?? fallback.title,
             detail: detail ?? advice ?? fallback.text,
