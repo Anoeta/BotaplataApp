@@ -15,6 +15,27 @@ struct DecimalString: Codable, Equatable, Sendable {
     func encode(to encoder: Encoder) throws { var c = encoder.singleValueContainer(); try c.encode(NSDecimalNumber(decimal: value).stringValue) }
 }
 
+struct FlexibleStringValueDTO: Codable, Equatable, Sendable {
+    let value: String?
+
+    init(_ value: String?) { self.value = value }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { value = nil; return }
+        if let stringValue = try? c.decode(String.self) { value = stringValue; return }
+        if let intValue = try? c.decode(Int.self) { value = String(intValue); return }
+        if let doubleValue = try? c.decode(Double.self) { value = NSDecimalNumber(value: doubleValue).stringValue; return }
+        if let boolValue = try? c.decode(Bool.self) { value = String(boolValue); return }
+        throw DecodingError.typeMismatch(String.self, .init(codingPath: decoder.codingPath, debugDescription: "Expected string, number, boolean, or null"))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encodeIfPresent(value)
+    }
+}
+
 struct RealActiveSnapshotDTO: Codable, Equatable, Sendable {
     let generatedAt: Date?
     let dataSource: String?
@@ -53,8 +74,8 @@ struct RealStrategyConditionDTO: Codable, Equatable, Sendable {
         key = try c.decodeIfPresent(String.self, forKey: .key) ?? c.decodeIfPresent(String.self, forKey: .code)
         label = try c.decodeIfPresent(String.self, forKey: .label)
         state = try c.decodeIfPresent(String.self, forKey: .state) ?? c.decodeIfPresent(String.self, forKey: .status)
-        value = try c.decodeIfPresent(String.self, forKey: .value)
-        threshold = try c.decodeIfPresent(String.self, forKey: .threshold)
+        value = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .value)?.value
+        threshold = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .threshold)?.value
         detail = try c.decodeIfPresent(String.self, forKey: .detail)
     }
 

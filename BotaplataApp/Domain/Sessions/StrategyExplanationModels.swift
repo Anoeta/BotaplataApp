@@ -18,7 +18,42 @@ struct StrategyMarketMomentum: Equatable, Sendable { let rawValue: String; let c
 struct StrategyCondition: Identifiable, Equatable, Sendable { let id: String; let code: String; let label: String; let status: StrategyConditionStatus; let statusRaw: String; let summary: String; let valueRaw: String?; let thresholdRaw: String?; let technicalDetail: String? }
 struct StrategyBlocker: Identifiable, Equatable, Sendable { let id: String; let code: String; let label: String; let summary: String; let severity: StrategyBlockerSeverity; let severityRaw: String; let recoverable: Bool?; let technicalDetail: String? }
 struct StrategyIndicator: Identifiable, Equatable, Sendable { let id: String; let name: String; let valueRaw: String?; let status: String?; let help: String; let technicalDetail: String? }
-struct StrategyIndicatorSet: Equatable, Sendable { let indicators: [StrategyIndicator] }
+struct StrategyIndicatorSet: Equatable, Sendable {
+  let indicators: [StrategyIndicator]
+  var rsi: Decimal? { decimalValue(for: "rsi") }
+  func value(for id: String) -> StrategyIndicator? { indicators.first { $0.id == id } }
+  private func decimalValue(for id: String) -> Decimal? {
+    guard let raw = value(for: id)?.valueRaw?.replacingOccurrences(of: ",", with: ".") else { return nil }
+    return Decimal(string: raw, locale: Locale(identifier: "en_US_POSIX"))
+  }
+}
 struct StrategyPositionProtection: Equatable, Sendable { let summary: String; let entryPriceRaw: String?; let currentPriceRaw: String?; let unrealizedPnLRaw: String?; let breakEvenPriceRaw: String?; let minimumProfitablePriceRaw: String?; let trailingActive: Bool?; let trailingStopRaw: String?; let sellConditions: [String]; let technicalDetail: String? }
 struct StrategyExplanationWarning: Identifiable, Equatable, Sendable { let id: String; let severity: StrategyBlockerSeverity; let title: String; let message: String }
 struct StrategyExplanationMeta: Equatable, Sendable { let requestID: String?; let serverTime: Date?; let generatedAt: Date?; let source: String? }
+
+struct StrategyRSIPresentation: Equatable, Sendable {
+  let rsiDisplayValue: String
+  let rsiStatusText: String
+  let isRSIUnavailable: Bool
+
+  init(explanation: StrategyExplanation) {
+    let condition = explanation.conditions.first { $0.code == "rsi" }
+    if let rsi = explanation.indicators.rsi {
+      rsiDisplayValue = Self.format(rsi)
+      rsiStatusText = condition?.status == .favorable ? "Favorable" : "À confirmer"
+      isRSIUnavailable = false
+    } else {
+      rsiDisplayValue = "RSI indisponible"
+      rsiStatusText = "La dernière analyse ne contient pas encore cette valeur."
+      isRSIUnavailable = true
+    }
+  }
+
+  private static func format(_ value: Decimal) -> String {
+    let formatter = NumberFormatter()
+    formatter.locale = Locale(identifier: "fr_FR")
+    formatter.minimumFractionDigits = 1
+    formatter.maximumFractionDigits = 1
+    return formatter.string(from: value as NSDecimalNumber) ?? NSDecimalNumber(decimal: value).stringValue
+  }
+}

@@ -184,3 +184,27 @@ final class StrategyExplanationTests: XCTestCase {
       #"{"data":{"session_id":"27","strategy":{"code":"star_v3","name":"Star Strategy V3","version":"3"},"decision":{"code":"wait","label":"Attente","summary":"Résumé"}\#(scoreField),"analysis":{"freshness":{"status":"fresh","is_stale":false}},"market":{"regime":{"code":"range","label":"Range"},"momentum":{"code":"neutral","label":"Neutre"}},"conditions":[],"blockers":[],"indicators":{},"warnings":[]},"meta":{"data_source":"persisted_strategy_decision"}}"#
   }
 }
+
+extension StrategyExplanationTests {
+  func testStrategyExplanationPreservesRSIFromCanonicalIndicatorsWhenConditionValueIsNull() throws {
+    let json = #"{"data":{"session_id":"27","strategy":{"code":"star_v3","name":"Star Strategy V3","version":"3"},"decision":{"code":"wait","label":"Attente","summary":"Résumé"},"score":{"current":3,"required":4},"analysis":{"candle_close_time":"2026-07-19T12:30:00Z","freshness":{"status":"fresh","is_stale":false}},"market":{"regime":{"code":"range","label":"Range"},"momentum":{"code":"neutral","label":"Neutre"}},"conditions":[{"code":"rsi","label":"RSI","status":"pending","value":null}],"blockers":[],"indicators":{"rsi":42.631071},"warnings":[]},"meta":{"data_source":"persisted_strategy_decision"}}"#
+    let dto = try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: Data(json.utf8))
+    let model = dto.mapped()
+    let rsiCondition = try XCTUnwrap(model.conditions.first { $0.code == "rsi" })
+    let viewModel = StrategyRSIPresentation(explanation: model)
+
+    XCTAssertEqual(model.indicators.rsi, Decimal(string: "42.631071"))
+    XCTAssertNil(rsiCondition.valueRaw)
+    XCTAssertEqual(viewModel.rsiDisplayValue, "42,6")
+    XCTAssertFalse(viewModel.isRSIUnavailable)
+    XCTAssertEqual(viewModel.rsiStatusText, "À confirmer")
+  }
+
+  func testStrategyExplanationRSIUnavailableOnlyWhenNoSourceProvidesIt() throws {
+    let json = #"{"data":{"session_id":"27","strategy":{"code":"star_v3","name":"Star Strategy V3"},"decision":{"code":"wait","label":"Attente","summary":"Résumé"},"analysis":{"freshness":{"status":"fresh","is_stale":false}},"market":{"regime":{"code":"range","label":"Range"},"momentum":{"code":"neutral","label":"Neutre"}},"conditions":[{"code":"rsi","label":"RSI","status":"pending","value":null}],"blockers":[],"indicators":{},"warnings":[]},"meta":{}}"#
+    let model = try JSONCoding.decoder.decode(RealStrategyExplanationDTO.self, from: Data(json.utf8)).mapped()
+    let viewModel = StrategyRSIPresentation(explanation: model)
+    XCTAssertNil(model.indicators.rsi)
+    XCTAssertTrue(viewModel.isRSIUnavailable)
+  }
+}
