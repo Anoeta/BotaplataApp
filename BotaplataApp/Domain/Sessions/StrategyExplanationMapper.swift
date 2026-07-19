@@ -64,19 +64,15 @@ extension RealStrategyExplanationDataDTO {
     private func mapScore() -> StrategyScore? {
         guard let score else { return nil }
 
-        let currentValue: Decimal? = Self.decimal(score.current)
-        let requiredValue: Decimal? = Self.decimal(score.required)
-        let maximumValue: Decimal? = Self.decimal(score.maximum)
-
         return StrategyScore(
-            currentRaw: score.current,
-            current: currentValue,
-            requiredRaw: score.required,
-            required: requiredValue,
-            maximumRaw: score.maximum,
-            maximum: maximumValue,
-            favorableConditions: score.favorableConditions,
-            totalConditions: score.totalConditions,
+            currentRaw: score.current.map { String($0.value) },
+            current: score.current?.value,
+            requiredRaw: score.required.map { String($0.value) },
+            required: score.required?.value,
+            maximumRaw: score.maximum.map { String($0.value) },
+            maximum: score.maximum?.value,
+            favorableConditions: score.favorableConditions?.value,
+            totalConditions: score.totalConditions?.value,
             summary: score.summary
         )
     }
@@ -126,9 +122,6 @@ extension RealStrategyExplanationDataDTO {
         warnings.map { $0.mapped() }
     }
 
-    private static func decimal(_ raw: String?) -> Decimal? {
-        raw.flatMap { Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")) }
-    }
 }
 
 private extension Optional where Wrapped == StrategyExplanationFreshnessDTO {

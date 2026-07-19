@@ -15,9 +15,9 @@
       "decided_at": "2026-07-19T09:55:00Z"
     },
     "score": {
-      "current": "2",
-      "required": "4",
-      "maximum": "4",
+      "current": 2,
+      "required": 4,
+      "maximum": 4,
       "favorable_conditions": 2,
       "total_conditions": 4,
       "summary": "2 conditions sur 4 sont favorables"

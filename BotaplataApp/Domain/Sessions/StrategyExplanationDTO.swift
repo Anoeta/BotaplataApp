@@ -4,7 +4,35 @@ struct RealStrategyExplanationDTO: Decodable, Sendable { let data: RealStrategyE
 struct RealStrategyExplanationDataDTO: Decodable, Sendable { let sessionID: String; let strategy: StrategyIdentityDTO; let decision: StrategyExplanationDecisionDTO; let score: StrategyExplanationScoreDTO?; let analysis: StrategyExplanationAnalysisDTO; let market: StrategyExplanationMarketDTO; let conditions: [StrategyExplanationConditionDTO]; let blockers: [StrategyExplanationBlockerDTO]; let indicators: StrategyExplanationIndicatorsDTO; let positionProtection: StrategyExplanationPositionProtectionDTO?; let warnings: [StrategyExplanationWarningDTO]; enum CodingKeys: String, CodingKey { case strategy, decision, score, analysis, market, conditions, blockers, indicators, warnings; case sessionID = "session_id", positionProtection = "position_protection" } }
 struct StrategyIdentityDTO: Decodable, Sendable { let code: String; let name: String; let version: String? }
 struct StrategyExplanationDecisionDTO: Decodable, Sendable { let code: String; let label: String; let summary: String; let technicalDetail: String?; let status: String?; let decidedAt: Date?; enum CodingKeys: String, CodingKey { case code, label, summary, status; case technicalDetail = "technical_detail", decidedAt = "decided_at" } }
-struct StrategyExplanationScoreDTO: Decodable, Sendable { let current: String?; let required: String?; let maximum: String?; let favorableConditions: Int?; let totalConditions: Int?; let summary: String?; enum CodingKeys: String, CodingKey { case current, required, maximum, summary; case favorableConditions = "favorable_conditions", totalConditions = "total_conditions" } }
+struct FlexibleIntDTO: Decodable, Sendable {
+    let value: Int
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if let intValue = try? container.decode(Int.self) {
+            value = intValue
+            return
+        }
+
+        if let doubleValue = try? container.decode(Double.self), doubleValue.isFinite, doubleValue.rounded(.towardZero) == doubleValue, doubleValue >= Double(Int.min), doubleValue <= Double(Int.max) {
+            value = Int(doubleValue)
+            return
+        }
+
+        if let stringValue = try? container.decode(String.self), let intValue = Int(stringValue) {
+            value = intValue
+            return
+        }
+
+        throw DecodingError.typeMismatch(
+            Int.self,
+            DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected an integer score encoded as a JSON number or numeric string")
+        )
+    }
+}
+
+struct StrategyExplanationScoreDTO: Decodable, Sendable { let current: FlexibleIntDTO?; let required: FlexibleIntDTO?; let maximum: FlexibleIntDTO?; let favorableConditions: FlexibleIntDTO?; let totalConditions: FlexibleIntDTO?; let summary: String?; enum CodingKeys: String, CodingKey { case current, required, maximum, summary; case favorableConditions = "favorable_conditions", totalConditions = "total_conditions" } }
 struct StrategyExplanationAnalysisDTO: Decodable, Sendable { let timeframe: String?; let candleCloseTime: Date?; let calculatedAt: Date?; let nextRecalculationAt: Date?; let freshness: StrategyExplanationFreshnessDTO?; let summary: String?; let technicalDetail: String?; enum CodingKeys: String, CodingKey { case timeframe, freshness, summary; case candleCloseTime = "candle_close_time", calculatedAt = "calculated_at", nextRecalculationAt = "next_recalculation_at", technicalDetail = "technical_detail" } }
 struct StrategyExplanationFreshnessDTO: Decodable, Sendable { let status: String?; let label: String?; let summary: String?; let isStale: Bool?; enum CodingKeys: String, CodingKey { case status, label, summary; case isStale = "is_stale" } }
 struct StrategyExplanationMarketDTO: Decodable, Sendable { let regime: StrategyExplanationRegimeDTO; let momentum: StrategyExplanationMomentumDTO; let summary: String? }
