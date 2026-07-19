@@ -55,9 +55,38 @@ final class MobileV1ContractDecodingTests: XCTestCase {
         for name in names { XCTAssertFalse(surface.localizedCaseInsensitiveContains(name)) }
     }
 
+
+    func testActiveSnapshotContractPreservesNullConditionValue() throws {
+        var raw = try fixtureString("real_active_snapshot_waiting_buy")
+        raw = raw.replacingOccurrences(of: #""key": "rsi""#, with: #""code": "rsi""#)
+        raw = raw.replacingOccurrences(of: #""state": "ok""#, with: #""status": "unavailable""#)
+        raw = raw.replacingOccurrences(of: #""value": "42""#, with: #""value": null"#)
+        let envelope = try JSONCoding.decoder.decode(APIEnvelope<RealActiveSnapshotDTO>.self, from: Data(raw.utf8))
+        let condition = try XCTUnwrap(envelope.data?.activeSession?.decision?.mapped().buyConditions.first)
+        XCTAssertEqual(condition.key, "rsi")
+        XCTAssertEqual(condition.state, "unavailable")
+        XCTAssertNil(condition.value)
+    }
+
+    func testSessionDetailContractPreservesNullConditionValue() throws {
+        var raw = try fixtureString("real_session_detail_waiting_buy")
+        raw = raw.replacingOccurrences(of: #""key": "rsi""#, with: #""code": "rsi""#)
+        raw = raw.replacingOccurrences(of: #""state": "ok""#, with: #""status": "unavailable""#)
+        raw = raw.replacingOccurrences(of: #""value": "42""#, with: #""value": null"#)
+        let envelope = try JSONCoding.decoder.decode(APIEnvelope<RealSessionDetailDTO>.self, from: Data(raw.utf8))
+        let condition = try XCTUnwrap(envelope.data?.decision?.mapped().buyConditions.first)
+        XCTAssertEqual(condition.key, "rsi")
+        XCTAssertEqual(condition.state, "unavailable")
+        XCTAssertNil(condition.value)
+    }
+
     private var warning: APIWarning { APIWarning(code: "monitoring_degraded", message: "La surveillance de cette session rencontre actuellement un problème.") }
     private func envelope<T: Decodable & Sendable>(_ name: String, _ type: T.Type) throws -> APIEnvelope<T> {
+        try JSONCoding.decoder.decode(APIEnvelope<T>.self, from: Data(fixtureString(name).utf8))
+    }
+
+    private func fixtureString(_ name: String) throws -> String {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/MobileV1/\(name).json")
-        return try JSONCoding.decoder.decode(APIEnvelope<T>.self, from: Data(contentsOf: url))
+        return try String(contentsOf: url, encoding: .utf8)
     }
 }

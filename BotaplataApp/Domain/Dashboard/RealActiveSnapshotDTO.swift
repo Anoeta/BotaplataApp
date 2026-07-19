@@ -29,7 +29,45 @@ struct RealFreshnessDTO: Codable, Equatable, Sendable { let snapshotGeneratedAt:
 struct RealMarketDTO: Codable, Equatable, Sendable { let currentPrice: DecimalString?; let quoteAsset: String?; let source: String?; let observedAt: Date?; let updatedAt: Date?; enum CodingKeys: String, CodingKey { case source; case currentPrice = "current_price", quoteAsset = "quote_asset", observedAt = "observed_at", updatedAt = "updated_at" } }
 struct RealDecisionDTO: Codable, Equatable, Sendable { let decision: String?; let title: String?; let detail: String?; let score: DecimalString?; let scoreMin: DecimalString?; let favorableConditions: Int?; let requiredConditions: Int?; let controller: String?; let blockers: [String]; let buyConditions: [RealStrategyConditionDTO]; let sellConditions: [RealStrategyConditionDTO]; let advice: String?; let price: DecimalString?; let createdAt: Date?; enum CodingKeys: String, CodingKey { case decision, title, detail, score, controller, blockers, advice, price; case scoreMin = "score_min", favorableConditions = "favorable_conditions", requiredConditions = "required_conditions", buyConditions = "buy_conditions", sellConditions = "sell_conditions", createdAt = "created_at" }
     init(from decoder: Decoder) throws { let c = try decoder.container(keyedBy: CodingKeys.self); decision = try c.decodeIfPresent(String.self, forKey: .decision); title = try c.decodeIfPresent(String.self, forKey: .title); detail = try c.decodeIfPresent(String.self, forKey: .detail); score = try c.decodeIfPresent(DecimalString.self, forKey: .score); scoreMin = try c.decodeIfPresent(DecimalString.self, forKey: .scoreMin); favorableConditions = try c.decodeIfPresent(Int.self, forKey: .favorableConditions); requiredConditions = try c.decodeIfPresent(Int.self, forKey: .requiredConditions); controller = try c.decodeIfPresent(String.self, forKey: .controller); blockers = try c.decodeIfPresent([String].self, forKey: .blockers) ?? []; buyConditions = try c.decodeIfPresent([RealStrategyConditionDTO].self, forKey: .buyConditions) ?? []; sellConditions = try c.decodeIfPresent([RealStrategyConditionDTO].self, forKey: .sellConditions) ?? []; advice = try c.decodeIfPresent(String.self, forKey: .advice); price = try c.decodeIfPresent(DecimalString.self, forKey: .price); createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) } }
-struct RealStrategyConditionDTO: Codable, Equatable, Sendable { let key: String?; let label: String?; let state: String?; let value: String?; let threshold: String?; let detail: String? }
+struct RealStrategyConditionDTO: Codable, Equatable, Sendable {
+    let key: String?
+    let label: String?
+    let state: String?
+    let value: String?
+    let threshold: String?
+    let detail: String?
+
+    enum CodingKeys: String, CodingKey { case key, code, label, state, status, value, threshold, detail }
+
+    init(key: String?, label: String?, state: String?, value: String?, threshold: String?, detail: String?) {
+        self.key = key
+        self.label = label
+        self.state = state
+        self.value = value
+        self.threshold = threshold
+        self.detail = detail
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = try c.decodeIfPresent(String.self, forKey: .key) ?? c.decodeIfPresent(String.self, forKey: .code)
+        label = try c.decodeIfPresent(String.self, forKey: .label)
+        state = try c.decodeIfPresent(String.self, forKey: .state) ?? c.decodeIfPresent(String.self, forKey: .status)
+        value = try c.decodeIfPresent(String.self, forKey: .value)
+        threshold = try c.decodeIfPresent(String.self, forKey: .threshold)
+        detail = try c.decodeIfPresent(String.self, forKey: .detail)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(key, forKey: .key)
+        try c.encodeIfPresent(label, forKey: .label)
+        try c.encodeIfPresent(state, forKey: .state)
+        try c.encodeIfPresent(value, forKey: .value)
+        try c.encodeIfPresent(threshold, forKey: .threshold)
+        try c.encodeIfPresent(detail, forKey: .detail)
+    }
+}
 struct RealPositionDTO: Codable, Equatable, Sendable { let id: String?; let status: String?; let side: String?; let symbol: String?; let baseQty: DecimalString?; let entryPrice: DecimalString?; let averageExecutionPrice: DecimalString?; let costBasisPrice: DecimalString?; let currentPrice: DecimalString?; let estimatedValueQuote: DecimalString?; let unrealizedPnlQuote: DecimalString?; let openedAt: Date?; let origin: String?; let reconciliationPending: Bool?; enum CodingKeys: String, CodingKey { case id, status, side, symbol, origin; case baseQty = "base_qty", entryPrice = "entry_price", averageExecutionPrice = "average_execution_price", costBasisPrice = "cost_basis_price", currentPrice = "current_price", estimatedValueQuote = "estimated_value_quote", unrealizedPnlQuote = "unrealized_pnl_quote", openedAt = "opened_at", reconciliationPending = "reconciliation_pending" } }
 struct RealOrderDTO: Codable, Equatable, Sendable { let id: String?; let exchangeOrderID: String?; let krakenOrderID: String?; let statusLabel: String?; let provider: String?; let exchangeOrderIDLabel: String?; let side: String?; let orderType: String?; let status: String?; let requestedQuantity: DecimalString?; let executedQuantity: DecimalString?; let limitPrice: DecimalString?; let averageFillPrice: DecimalString?; let averageExecutionPrice: DecimalString?; let requestedQuoteAmount: DecimalString?; let executedQuoteAmount: DecimalString?; let createdAt: Date?; let updatedAt: Date?; enum CodingKeys: String, CodingKey { case id, side, status, provider; case exchangeOrderID = "exchange_order_id", krakenOrderID = "kraken_order_id", statusLabel = "status_label", exchangeOrderIDLabel = "exchange_order_id_label", orderType = "order_type", requestedQuantity = "requested_quantity", executedQuantity = "executed_quantity", limitPrice = "limit_price", averageFillPrice = "average_fill_price", averageExecutionPrice = "average_execution_price", requestedQuoteAmount = "requested_quote_amount", executedQuoteAmount = "executed_quote_amount", createdAt = "created_at", updatedAt = "updated_at" } }
 struct RealReconciliationDTO: Codable, Equatable, Sendable { let state: String?; let required: Bool?; let orderID: String?; let lastCheckedAt: Date?; let lastReconciledAt: Date?; let nextAttemptAt: Date?; let lookupSource: String?; enum CodingKeys: String, CodingKey { case state, required; case orderID = "order_id"; case lastCheckedAt = "last_checked_at", lastReconciledAt = "last_reconciled_at", nextAttemptAt = "next_attempt_at", lookupSource = "lookup_source" } }
