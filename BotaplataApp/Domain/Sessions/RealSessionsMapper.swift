@@ -27,7 +27,7 @@ extension RealDecisionDTO {
         let fallback = DashboardPresentation.wording(for: lifecycle)
         return StrategyDecisionSummary(
             title: title ?? decision.map(Self.localTitle(for:)) ?? fallback.title,
-            detail: detail ?? advice.first ?? fallback.text,
+            detail: detail ?? advice ?? fallback.text,
             favorableConditions: favorableConditions,
             requiredConditions: requiredConditions,
             code: decision,

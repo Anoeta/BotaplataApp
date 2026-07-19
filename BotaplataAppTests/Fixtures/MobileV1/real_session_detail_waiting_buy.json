@@ -41,8 +41,8 @@
     },
     "decision": {
       "decision": "waiting_buy",
-      "title": "Entr\u00e9e \u00e0 confirmer",
-      "detail": "Les conditions d'achat ne sont pas encore toutes r\u00e9unies.",
+      "title": "Entrée à confirmer",
+      "detail": "Les conditions d'achat ne sont pas encore toutes réunies.",
       "score": "3",
       "score_min": "4",
       "favorable_conditions": 3,
@@ -62,9 +62,7 @@
         }
       ],
       "sell_conditions": [],
-      "advice": [
-        "Attendre confirmation"
-      ],
+      "advice": "Attendre confirmation",
       "price": "79.24",
       "created_at": "2026-07-18T09:59:45Z"
     },
@@ -87,7 +85,7 @@
   "warnings": [
     {
       "code": "monitoring_degraded",
-      "message": "La surveillance de cette session rencontre actuellement un probl\u00e8me."
+      "message": "La surveillance de cette session rencontre actuellement un problème."
     }
   ]
 }

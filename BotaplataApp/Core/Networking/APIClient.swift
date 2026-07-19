@@ -72,7 +72,7 @@ struct APIClient: APIClientProtocol {
                 envelope = try JSONCoding.decoder.decode(APIEnvelope<Response>.self, from: data)
             } catch let decodingError as DecodingError {
                 BotaplataSignpost.end("JSON decoding", id: decodeSignpost)
-                Self.logDecodingError(decodingError, requestID: requestID, endpoint: sanitizedPath, dto: String(describing: Response.self))
+                Self.logDecodingError(decodingError, data: data, requestID: requestID, endpoint: sanitizedPath, dto: String(describing: Response.self))
                 throw decodingError
             }
             BotaplataSignpost.end("JSON decoding", id: decodeSignpost)
@@ -121,7 +121,7 @@ struct APIClient: APIClientProtocol {
         await NetworkDiagnosticsStore.shared.record(NetworkDiagnosticEntry(requestID: requestID, method: method, endpoint: endpoint, feature: feature, startedAt: startedAt, duration: total, statusCode: statusCode, result: category, cacheStatus: .miss))
     }
 
-    private static func logDecodingError(_ error: DecodingError, requestID: String, endpoint: String, dto: String) {
+    private static func logDecodingError(_ error: DecodingError, data: Data, requestID: String, endpoint: String, dto: String) {
         guard DiagnosticsConfiguration.verboseNetworkLogs else { return }
         let path: String; let kind: String
         switch error {
@@ -131,8 +131,26 @@ struct APIClient: APIClientProtocol {
         case .dataCorrupted(let context): path = context.codingPath.map(\.stringValue).joined(separator: "."); kind = "dataCorrupted"
         @unknown default: path = "<unknown>"; kind = "unknown"
         }
-        BotaplataLog.network.error("[\(requestID, privacy: .public)] decoding failed endpoint=\(endpoint, privacy: .public) dto=\(dto, privacy: .public) path=\(path, privacy: .public) kind=\(kind, privacy: .public)")
+        let diagnostics = Self.decodingDiagnostics(data: data, codingPath: path)
+        BotaplataLog.network.error("[\(requestID, privacy: .public)] decoding failed endpoint=\(endpoint, privacy: .public) dto=\(dto, privacy: .public) path=\(path, privacy: .public) kind=\(kind, privacy: .public) \(diagnostics, privacy: .public)")
     }
+    private static func decodingDiagnostics(data: Data, codingPath: String) -> String {
+        guard let root = try? JSONSerialization.jsonObject(with: data) else { return "actualType=unknown" }
+        let parts = codingPath.split(separator: ".").map(String.init)
+        let value = parts.reduce(Optional(root as Any)) { current, part in
+            guard let current else { return nil }
+            if let dict = current as? [String: Any] { return dict[part] }
+            if let array = current as? [Any], let index = Int(part), array.indices.contains(index) { return array[index] }
+            return nil
+        }
+        if let dict = value as? [String: Any] { return "actualType=object availableKeys=\(dict.keys.sorted())" }
+        if value is [Any] { return "actualType=array" }
+        if value is String { return "actualType=string" }
+        if value is NSNumber { return "actualType=number" }
+        if value is NSNull || value == nil { return "actualType=null" }
+        return "actualType=unknown"
+    }
+
 }
 
 enum HTTPHeaders {

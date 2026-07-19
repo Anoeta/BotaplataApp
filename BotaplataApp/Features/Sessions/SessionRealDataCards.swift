@@ -64,7 +64,7 @@ enum RealSessionUIPresentation {
 }
 
 struct DecisionSummaryCard: View { let session: SessionDetail; var detailed = false
-    var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Décision actuelle").font(BotaplataTypography.cardTitle); Text(session.decision.title).font(.headline); Text(session.decision.detail).foregroundStyle(BotaplataColors.textSecondary); ForEach(RealSessionUIPresentation.decisionLines(session.decision), id: \.label) { PremiumKeyValueRow(label: $0.label, value: $0.value, monospaced: true) }; if detailed { ForEach(session.decision.advice, id: \.self) { Text($0).font(.caption).foregroundStyle(BotaplataColors.textMuted) } } } }.accessibilityElement(children: .combine) }
+    var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Décision actuelle").font(BotaplataTypography.cardTitle); Text(session.decision.title).font(.headline); Text(session.decision.detail).foregroundStyle(BotaplataColors.textSecondary); ForEach(RealSessionUIPresentation.decisionLines(session.decision), id: \.label) { PremiumKeyValueRow(label: $0.label, value: $0.value, monospaced: true) }; if detailed, let advice = session.decision.advice, advice != session.decision.detail { Text(advice).font(.caption).foregroundStyle(BotaplataColors.textMuted) } } }.accessibilityElement(children: .combine) }
 }
 
 struct StrategyConditionsCard: View { let decision: StrategyDecisionSummary
