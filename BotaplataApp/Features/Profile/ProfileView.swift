@@ -22,7 +22,7 @@ struct ProfileView: View {
     var body: some View {
         ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { header; stateBanner; securityCard; devicesCard; notificationsCard; serverCard; aboutCard; logoutCard }.padding(BotaplataSpacing.md) } }
             .navigationTitle("Profil")
-            .refreshable { await store.bootstrap(); await pushStore.refreshAll() }
+            .refreshable { await store.bootstrap(); await pushStore.refreshAll(force: true) }
             .sheet(isPresented: $showingAbout) { NavigationStack { AboutBotaplataView(diagnostic: store.diagnostic) } }
             .navigationDestination(isPresented: $showingDiagnostic) { DiagnosticView(diagnostic: store.diagnostic, permissionStatus: pushStore.permissionStatus) }
             .alert("Se déconnecter de Botaplata ?", isPresented: $confirmsLogout) { Button("Annuler", role: .cancel) {}; Button("Se déconnecter", role: .destructive) { Task { await logout() } } } message: { Text("Vous devrez saisir à nouveau votre mot de passe et votre code de vérification.") }

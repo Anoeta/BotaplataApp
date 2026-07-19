@@ -3,7 +3,10 @@ import Foundation
 nonisolated struct PushDeviceMetadata: Codable, Equatable, Sendable { let deviceName: String; let environment: PushAPNSEnvironment; let appBundleID: String; let appVersion: String; let osVersion: String; enum CodingKeys: String, CodingKey { case deviceName = "device_name", environment, appBundleID = "app_bundle_id", appVersion = "app_version", osVersion = "os_version" } }
 nonisolated enum PushAPNSEnvironment: String, Codable, Sendable { case sandbox, production }
 nonisolated struct PushDeviceRegistration: Codable, Equatable, Sendable { let registered: Bool; let environment: PushAPNSEnvironment?; let warnings: [APIWarning]? }
-nonisolated struct PushPreferences: Codable, Equatable, Sendable { var categories: [PushPreferenceItem]; let updatedAt: Date?; enum CodingKeys: String, CodingKey { case categories, updatedAt = "updated_at" } }
+nonisolated struct PushPreferences: Codable, Equatable, Sendable { var categories: [PushPreferenceItem]; let updatedAt: Date?; enum CodingKeys: String, CodingKey { case categories, updatedAt = "updated_at" }
+    init(categories: [PushPreferenceItem], updatedAt: Date?) { self.categories = categories; self.updatedAt = updatedAt }
+    init(from decoder: Decoder) throws { let c = try decoder.container(keyedBy: CodingKeys.self); categories = try c.decodeIfPresent([PushPreferenceItem].self, forKey: .categories) ?? []; updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) }
+}
 nonisolated struct PushPreferenceItem: Codable, Equatable, Identifiable, Sendable { let eventType: String; var enabled: Bool; let mandatory: Bool; let severity: NotificationSeverity?; var id: String { eventType }; enum CodingKeys: String, CodingKey { case eventType = "event_type", enabled, mandatory, severity } }
 nonisolated struct PushPreferencesUpdate: Codable, Equatable, Sendable { let categories: [PushPreferenceUpdateItem] }
 nonisolated struct PushPreferenceUpdateItem: Codable, Equatable, Sendable { let eventType: String; let enabled: Bool; enum CodingKeys: String, CodingKey { case eventType = "event_type", enabled } }

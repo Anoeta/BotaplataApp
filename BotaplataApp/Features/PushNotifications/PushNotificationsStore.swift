@@ -25,6 +25,8 @@ final class PushNotificationsStore {
     private let badgeManager: AppBadgeManaging
     private var loadTask: Task<Void, Never>?
     private var generation = 0
+    private var lastPreferencesLoadAt: Date?
+    private let preferencesCacheTTL: TimeInterval = 60
 
     init(repository: PushNotificationsRepository, permissionManager: PushNotificationPermissionManaging, cache: PushNotificationsCache, authSession: AuthenticationSession, appState: AppState, badgeManager: AppBadgeManaging = AppBadgeManager()) {
         self.repository = repository
@@ -38,6 +40,7 @@ final class PushNotificationsStore {
     var unreadCount: Int { self.summary?.unreadCount ?? 0 }
 
     func bootstrap() async {
+        BotaplataLog.network.debug("PushPreferencesStore.load reason=bootstrap")
         self.permissionStatus = await self.permissionManager.authorizationStatus()
         if let cached = await self.cache.load() {
             self.notifications = .loadedFromCache(cached.notifications)
@@ -45,11 +48,13 @@ final class PushNotificationsStore {
             self.preferences = cached.preferences.map { .loadedFromCache($0) } ?? .idle
             await self.updateBadge()
         }
-        await self.refreshAll()
+        await self.refreshAll(reason: "bootstrap")
     }
 
-    func refreshAll() async {
-        if self.loadTask != nil { return }
+    func refreshAll(reason: String = "refresh", force: Bool = false) async {
+        BotaplataLog.network.debug("PushPreferencesStore.load reason=\(reason, privacy: .public)")
+        if self.loadTask != nil { BotaplataLog.network.debug("PushPreferencesStore.load skipped reason=singleFlight"); return }
+        if !force, let lastPreferencesLoadAt, Date().timeIntervalSince(lastPreferencesLoadAt) < preferencesCacheTTL { BotaplataLog.network.debug("PushPreferencesStore.load skipped reason=freshCache"); return }
         let nextGeneration = self.generation + 1
         self.generation = nextGeneration
         self.loadTask = Task { await self.load(generation: nextGeneration) }
@@ -71,6 +76,7 @@ final class PushNotificationsStore {
             }
             guard generation == self.generation else { return }
             self.preferences = .loaded(prefs)
+            self.lastPreferencesLoadAt = Date()
             self.notifications = .loaded(page.items)
             self.summary = sum
             await self.cache.save(.init(notifications: page.items, summary: sum, preferences: prefs, savedAt: Date()))

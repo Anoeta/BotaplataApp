@@ -10,6 +10,18 @@ struct DeviceRevocationResult: Codable, Equatable, Sendable {
     }
 }
 
+struct AuthorizedDevicesResponseDTO: Decodable, Sendable {
+    let devices: [AuthorizedDevice]
+    let currentDeviceID: String?
+    enum CodingKeys: String, CodingKey { case devices; case currentDeviceID = "current_device_id" }
+    var mappedDevices: [AuthorizedDevice] {
+        guard let currentDeviceID else { return devices }
+        return devices.map { device in
+            AuthorizedDevice(id: device.id, name: device.name, model: device.model, osVersion: device.osVersion, appVersion: device.appVersion, locale: device.locale, createdAt: device.createdAt, lastSeenAt: device.lastSeenAt, lastAuthenticatedAt: device.lastAuthenticatedAt, isCurrent: device.isCurrent || device.id == currentDeviceID, isRevoked: device.isRevoked)
+        }
+    }
+}
+
 struct RemoteAuthenticationRepository: AuthenticationRepository {
     let client: APIClientProtocol
     private let prefix = "api/mobile/v1/auth"
@@ -55,10 +67,10 @@ struct RemoteAuthenticationRepository: AuthenticationRepository {
 
     func authorizedDevices(accessToken: String) async throws -> [AuthorizedDevice] {
         try await self.map {
-            let response: [AuthorizedDevice] = try await self.client.send(
+            let response: AuthorizedDevicesResponseDTO = try await self.client.send(
                 APIEndpoint(method: .get, path: "\(self.prefix)/devices", headers: HTTPHeaders.bearer(accessToken))
             )
-            return response
+            return response.mappedDevices
         }
     }
 
