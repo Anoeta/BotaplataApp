@@ -12,9 +12,9 @@ L'app iOS utilise des repositories distants injectés avec `APIClientProtocol`. 
 
 | Environnement | Backend | Mocks | Notes |
 |---|---|---|---|
-| Development | `BOTAPLATA_API_BASE_URL` si fourni | non par défaut | URL locale autorisée seulement si explicitement configurée |
-| TestFlight | `BOTAPLATA_API_BASE_URL` requis | non | aucun fallback IP locale |
-| Production | `BOTAPLATA_API_BASE_URL` requis | non | aucun fallback IP locale |
+| Development | `BOTAPLATA_NETWORK_ENVIRONMENT + environment-specific base URL` si fourni | non par défaut | URL locale autorisée seulement si explicitement configurée |
+| TestFlight | `BOTAPLATA_NETWORK_ENVIRONMENT + environment-specific base URL` requis | non | aucun fallback IP locale |
+| Production | `BOTAPLATA_NETWORK_ENVIRONMENT + environment-specific base URL` requis | non | aucun fallback IP locale |
 | UI Tests | aucun backend | oui | flag `--botaplata-ui-tests` |
 | Previews | aucun backend | oui | `PreviewFixtures` |
 | Debug demo | aucun backend | oui | `--botaplata-demo-authenticated` ou `BOTAPLATA_DEBUG_DEMO=1` en DEBUG uniquement |
@@ -123,7 +123,7 @@ Voir `Docs/CACHE_AND_OFFLINE_SECURITY.md`. Le mode offline affiche le dernier é
 
 ## Checklist go/no-go
 
-- `BOTAPLATA_API_BASE_URL` TestFlight configuré.
+- `BOTAPLATA_NETWORK_ENVIRONMENT + environment-specific base URL` TestFlight configuré.
 - Backend joignable depuis l'iPhone hors Wi-Fi via Tailscale ou HTTPS.
 - Login/2FA OK.
 - Dashboard, Sessions, Journal, Profil, Notifications OK.

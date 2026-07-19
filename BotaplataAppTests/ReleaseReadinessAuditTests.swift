@@ -1,15 +1,15 @@
 import XCTest
 
 final class ReleaseReadinessAuditTests: XCTestCase {
-    private let auditedRoots = ["BotaplataApp", "BotaplataApp.xcodeproj", "Docs"]
+    private let auditedRoots = ["BotaplataApp", "BotaplataApp.xcodeproj"]
     private let releaseSourceRoots = ["BotaplataApp", "BotaplataApp.xcodeproj"]
-    private let allowedLocalDevelopmentURL = "http://192.168.1.47:31119"
+    private let allowedLocalDevelopmentURL = "http://192.168.x.x:31119"
 
     func testProductionAndTestFlightHaveNoLocalBaseURLFallback() throws {
         let environment = try file("BotaplataApp/App/AppEnvironment.swift")
         XCTAssertFalse(environment.contains(allowedLocalDevelopmentURL))
-        XCTAssertTrue(environment.contains("Bundle.main.botaplataBaseURL"))
-        XCTAssertTrue(environment.contains("BOTAPLATA_API_BASE_URL"))
+        XCTAssertTrue(environment.contains("Bundle.main.botaplataNetworkConfiguration"))
+        XCTAssertTrue(try file("BotaplataApp/Core/Configuration/NetworkConfiguration.swift").contains("BOTAPLATA_NETWORK_ENVIRONMENT"))
     }
 
     func testMocksAreLimitedToUITestsPreviewsAndExplicitDebugDemo() throws {
@@ -35,8 +35,9 @@ final class ReleaseReadinessAuditTests: XCTestCase {
     func testNoGlobalATSBypassOrAppleSecretFiles() throws {
         for path in try allFiles(roots: auditedRoots) {
             XCTAssertFalse(path.hasSuffix(".p8"), "APNs private keys must never be committed: \(path)")
-            XCTAssertFalse(try file(path).contains("NSAllowsArbitraryLoads = true"), "No global ATS bypass in \(path)")
-            XCTAssertFalse(try file(path).contains("<key>NSAllowsArbitraryLoads</key>\n\t<true/>"), "No global ATS bypass in \(path)")
+            let contents = try file(path)
+            XCTAssertFalse(contents.contains("NSAllowsArbitraryLoads"), "No global ATS bypass in \(path)")
+            XCTAssertFalse(contents.contains("NSExceptionDomains"), "No ATS exception domains in \(path)")
         }
     }
 

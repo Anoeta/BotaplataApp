@@ -2,8 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>BOTAPLATA_API_BASE_URL</key>
-	<string>$(BOTAPLATA_API_BASE_URL)</string>
+	<key>BOTAPLATA_NETWORK_ENVIRONMENT</key>
+	<string>$(BOTAPLATA_NETWORK_ENVIRONMENT)</string>
+	<key>BOTAPLATA_DEVELOPMENT_LOCAL_BASE_URL</key>
+	<string>$(BOTAPLATA_DEVELOPMENT_LOCAL_BASE_URL)</string>
+	<key>BOTAPLATA_DEVELOPMENT_REMOTE_BASE_URL</key>
+	<string>$(BOTAPLATA_DEVELOPMENT_REMOTE_BASE_URL)</string>
+	<key>BOTAPLATA_RELEASE_BASE_URL</key>
+	<string>$(BOTAPLATA_RELEASE_BASE_URL)</string>
 	<key>INFOPLIST_KEY_NSFaceIDUsageDescription</key>
 	<string>Botaplata utilise Face ID pour verrouiller localement l’accès aux informations de votre bot.</string>
 	<key>NSFaceIDUsageDescription</key>

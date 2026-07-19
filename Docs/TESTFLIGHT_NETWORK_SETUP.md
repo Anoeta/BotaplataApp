@@ -7,7 +7,7 @@ Option A — Tailscale privé est recommandée pour la première TestFlight priv
 À configurer dans Xcode ou dans la configuration de build TestFlight :
 
 ```text
-BOTAPLATA_API_BASE_URL=<À_CONFIGURER>
+BOTAPLATA_NETWORK_ENVIRONMENT + environment-specific base URL=<À_CONFIGURER>
 ```
 
 Ne pas inventer l'URL finale tant que le mode Tailscale exact n'est pas choisi. Exemples possibles selon l'installation :
@@ -24,7 +24,7 @@ Si le backend n'expose que HTTP local, privilégier un reverse proxy local/Tails
 1. Installer Tailscale sur le Raspberry et sur l'iPhone de test.
 2. Connecter les deux appareils au même tailnet.
 3. Exposer le backend uniquement dans le tailnet, idéalement via HTTPS ou Tailscale Serve.
-4. Définir `BOTAPLATA_API_BASE_URL` avec l'URL privée réellement vérifiée.
+4. Définir `BOTAPLATA_NETWORK_ENVIRONMENT + environment-specific base URL` avec l'URL privée réellement vérifiée.
 5. Depuis l'iPhone, ouvrir l'URL de santé backend dans Safari ou vérifier via l'app avec un login réel.
 
 ## Option B — HTTPS public plus tard
@@ -35,10 +35,10 @@ Pour une distribution plus large, utiliser un nom de domaine public HTTPS avec r
 
 Le port backend ne doit pas être publié tel quel sur Internet. Une exposition directe augmente le risque de scan, d'attaque brute force, de fuite de surface d'administration et de mauvaise configuration TLS.
 
-## Choix de `BOTAPLATA_API_BASE_URL`
+## Choix de `BOTAPLATA_NETWORK_ENVIRONMENT + environment-specific base URL`
 
 - Development peut pointer vers une URL locale uniquement quand elle est explicitement configurée.
-- TestFlight et Production doivent recevoir une URL explicite et ne doivent jamais retomber silencieusement vers `http://192.168.1.47:31119`.
+- TestFlight et Production doivent recevoir une URL explicite et ne doivent jamais retomber silencieusement vers `http://192.168.x.x:31119`.
 - Previews, UI tests et démo debug explicite peuvent utiliser des mocks sans backend.
 
 ## Vérification depuis l'iPhone

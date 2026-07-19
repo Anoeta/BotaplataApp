@@ -3,9 +3,9 @@ import XCTest
 
 final class RepositoryConfigurationTests: XCTestCase {
     func testSnapshotRepositoryDoesNotFallbackToMockWithoutBaseURL() async {
-        let development = AppEnvironment(name: "Development", kind: .development, dataSource: .unknown, fixtureSource: nil, isProductionData: false, baseURL: nil)
-        let testFlight = AppEnvironment(name: "TestFlight", kind: .testFlight, dataSource: .unknown, fixtureSource: nil, isProductionData: true, baseURL: nil)
-        let production = AppEnvironment(name: "Production", kind: .production, dataSource: .unknown, fixtureSource: nil, isProductionData: true, baseURL: nil)
+        let development = AppEnvironment(name: "Development", kind: .development, dataSource: .unknown, fixtureSource: nil, isProductionData: false, networkConfiguration: nil)
+        let testFlight = AppEnvironment(name: "TestFlight", kind: .testFlight, dataSource: .unknown, fixtureSource: nil, isProductionData: true, networkConfiguration: nil)
+        let production = AppEnvironment(name: "Production", kind: .production, dataSource: .unknown, fixtureSource: nil, isProductionData: true, networkConfiguration: nil)
         for environment in [development, testFlight, production] {
             await XCTAssertThrowsAuthentication(.notConfigured) {
                 _ = try await BotaplataApp.makeSnapshotRepository(environment: environment).fetchActiveSnapshot(accessToken: "token")
