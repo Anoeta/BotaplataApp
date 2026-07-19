@@ -30,6 +30,7 @@ struct RootView: View {
                     NavigationStack(path: $router.profilePath) { ProfileContainerView(store: profileStore, pushStore: pushStore) }.tabItem { Label(AppTab.profile.title, systemImage: AppTab.profile.symbol) }.tag(AppTab.profile)
                 }
                 .tint(BotaplataColors.primaryTeal)
+                .task { await pushStore.bootstrap() }
             case .restoring:
                 AuthenticationRestoringView()
             case .unknown:
