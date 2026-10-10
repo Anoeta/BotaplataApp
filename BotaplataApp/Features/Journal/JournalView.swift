@@ -15,7 +15,7 @@ enum JournalFilter: String, CaseIterable, Identifiable { case all, decisions, or
 struct JournalEventPresentation: Equatable { let title: String; let category: JournalFilter; let categoryLabel: String; let icon: String; let status: BadgeStatus; let severityText: String?
     static func make(from event: TimelineEvent) -> Self {
         let category: JournalFilter = switch event.type { case .cycleAnalyzed, .decisionRecorded: .decisions; case .buySubmitted, .buyPartiallyFilled, .buyFilled, .sellSubmitted, .sellPartiallyFilled, .sellFilled, .reconciliationPending, .reconciliationCompleted: .orders; case .positionOpened, .positionClosed: .positions; case .sessionStarted, .sessionStopped, .monitoringDegraded, .error, .unknown: .system }
-        let title: String = switch event.type { case .sessionStarted: "Session démarrée"; case .cycleAnalyzed: "Données actualisées"; case .decisionRecorded: "Décision recalculée"; case .buySubmitted: "Ordre d'achat envoyé à Kraken"; case .buyPartiallyFilled: "Ordre d'achat partiellement exécuté"; case .buyFilled: "Achat confirmé par Kraken"; case .positionOpened: "Position ouverte"; case .sellSubmitted: "Ordre de vente envoyé à Kraken"; case .sellPartiallyFilled: "Ordre de vente partiellement exécuté"; case .sellFilled: "Vente confirmée par Kraken"; case .positionClosed: "Position fermée"; case .reconciliationPending: "Vérification de l'ordre nécessaire"; case .reconciliationCompleted: "Vérification terminée"; case .monitoringDegraded: "Surveillance perturbée"; case .sessionStopped: "Session arrêtée"; case .error: "Erreur de surveillance"; case .unknown: event.title }
+        let title: String = switch event.type { case .sessionStarted: "Session démarrée"; case .cycleAnalyzed: "Cycle d’analyse"; case .decisionRecorded: "Décision enregistrée"; case .buySubmitted: "Ordre d'achat envoyé à Kraken"; case .buyPartiallyFilled: "Ordre d'achat partiellement exécuté"; case .buyFilled: "Achat confirmé par Kraken"; case .positionOpened: "Position ouverte"; case .sellSubmitted: "Ordre de vente envoyé à Kraken"; case .sellPartiallyFilled: "Ordre de vente partiellement exécuté"; case .sellFilled: "Vente confirmée par Kraken"; case .positionClosed: "Position fermée"; case .reconciliationPending: "Vérification de l'ordre nécessaire"; case .reconciliationCompleted: "Vérification terminée"; case .monitoringDegraded: "Surveillance perturbée"; case .sessionStopped: "Session arrêtée"; case .error: "Erreur de surveillance"; case .unknown: event.title }
         let icon: String = switch category { case .decisions: "brain.head.profile"; case .orders: "arrow.up.arrow.down"; case .positions: "chart.line.uptrend.xyaxis"; case .system, .all: "server.rack" }
         let status: BadgeStatus = switch event.severity { case .success: .success; case .warning: .warning; case .danger: .danger; case .neutral: .neutral; case .info: category == .system ? .neutral : .active }
         let severity = event.severity == .warning ? "Attention" : event.severity == .danger ? "Critique" : nil
@@ -34,8 +34,45 @@ struct JournalView: View { let session: SessionSummary?; let sessions: [SessionS
     var isOffline: Bool { if case .offline = content { true } else { false } }
 }
 
-struct JournalEventCard: View { let event: TimelineEvent; let session: SessionSummary?; var context: JournalEventCardContext = .global; @State private var expanded = false; private var p: JournalEventPresentation { .make(from: event) }
-    var body: some View { Button { expanded.toggle() } label: { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { HStack(alignment: .top) { IconBadge(symbol: p.icon, label: p.categoryLabel, color: p.status.color); Spacer(); Text(HistoryPresentation.time(event.occurredAt)).font(.caption.monospacedDigit()).foregroundStyle(BotaplataColors.textMuted) }; Text(p.title).font(BotaplataTypography.cardTitle).foregroundStyle(BotaplataColors.textPrimary); Text(event.message).font(BotaplataTypography.body).foregroundStyle(BotaplataColors.textSecondary); HStack { if context == .global, let session { Text(session.pair) }; Text(p.categoryLabel); if let severity = p.severityText { Text(severity) } }.font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.textMuted); if expanded { EventMetadataRow(title: "Date", value: HistoryPresentation.fullDate(event.occurredAt)); if let id = event.relatedOrderID { EventMetadataRow(title: "Ordre", value: String(id.suffix(8))) } } } } }.buttonStyle(.plain).accessibilityElement(children: .combine).accessibilityLabel("Événement Journal. \(p.title). \(event.message). \(HistoryPresentation.fullDate(event.occurredAt)).") }
+struct JournalEventCard: View {
+    let event: TimelineEvent
+    let session: SessionSummary?
+    var context: JournalEventCardContext = .global
+    @State private var expanded = false
+    private var presentation: JournalEventPresentation { .make(from: event) }
+    var body: some View {
+        Button { expanded.toggle() } label: {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(spacing: 8) {
+                    Image(systemName: presentation.icon).font(.subheadline)
+                        .foregroundStyle(presentation.status.color)
+                        .frame(width: 32, height: 32)
+                        .background(presentation.status.color.opacity(0.12), in: Circle())
+                    Rectangle().fill(BotaplataColors.separator).frame(width: 1, height: 30)
+                }.accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(HistoryPresentation.time(event.occurredAt)).font(.caption.monospacedDigit()).foregroundStyle(BotaplataColors.textMuted)
+                    Text(presentation.title).font(.headline)
+                    Text(event.message).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary)
+                    if let severity = presentation.severityText { Text(severity).font(.caption.bold()).foregroundStyle(presentation.status.color) }
+                    if context == .global, let session { Text(session.pair).font(.caption).foregroundStyle(BotaplataColors.textMuted) }
+                    if expanded {
+                        Text(HistoryPresentation.fullDate(event.occurredAt)).font(.caption)
+                        if let id = event.relatedOrderID { Text("Ordre · " + String(id.suffix(8))).font(.caption.monospaced()) }
+                    }
+                }
+                Spacer(minLength: 0)
+                Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(BotaplataColors.textMuted)
+            }
+            .foregroundStyle(BotaplataColors.textPrimary)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(presentation.title). \(event.message). \(HistoryPresentation.fullDate(event.occurredAt))")
+        .accessibilityHint(expanded ? "Masquer le détail" : "Afficher le détail")
+    }
 }
 struct EventMetadataRow: View { let title: String; let value: String; var body: some View { HStack { Text(title).foregroundStyle(BotaplataColors.textMuted); Spacer(); Text(value).foregroundStyle(BotaplataColors.textSecondary).monospacedDigit() }.font(.caption) } }
 
@@ -44,8 +81,38 @@ struct DecisionsHistoryView: View { let session: SessionDetail; let store: RealS
 struct SessionJournalHistoryView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { JournalView(session: SessionSummary(id: session.id, pair: session.pair, provider: session.provider, providerLabel: session.providerLabel, backendStatus: session.backendStatus, lifecycle: session.lifecycle, runtimeHealth: session.runtimeHealth, freshness: session.freshness, executionMode: session.executionMode), sessions: [], content: store.timelines[session.id] ?? .idle, warnings: store.warnings[session.id] ?? [], context: .session, loadNext: { await store.loadNextTimeline(sessionID: session.id) }, refresh: { await store.refreshTimeline(sessionID: session.id) }).task { await store.refreshTimeline(sessionID: session.id) } } }
 
 struct PagedHistoryList<Item: Identifiable & Sendable, Row: View>: View { let title: String; let content: LoadedContent<[Item]>; let emptyTitle: String; let emptyMessage: String; let loadNext: () async -> Void; let row: (Item) -> Row; var body: some View { ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { Text(title).font(BotaplataTypography.sectionTitle).accessibilityAddTraits(.isHeader); switch content { case .idle, .loading: ForEach(0..<3, id: \.self) { _ in PremiumSkeletonCard() }; case .error: PremiumErrorState(title: "Chargement impossible", message: "Vérifiez votre connexion puis réessayez."); case .loaded(let items), .loadedFromCache(let items), .refreshing(let items?), .offline(let items?), .partial(let items), .stale(let items): if items.isEmpty { PremiumEmptyState(title: emptyTitle, message: emptyMessage) } else { ForEach(items) { item in row(item).task { if item.id == items.last?.id { await loadNext() } } }; if case .refreshing = content { ProgressView().frame(maxWidth: .infinity) } }; case .refreshing(nil), .offline(nil): PremiumErrorState(title: "Chargement impossible", message: "Vérifiez votre connexion puis réessayez.") } }.padding().safeAreaPadding(.bottom, BotaplataSpacing.xl) } } }
-struct OrderRow: View { let order: SessionOrder; var body: some View { BotaplataCard { VStack(alignment: .leading, spacing: 8) { HStack { Text(order.side.label).font(.headline); Spacer(); StatusBadge(status: order.status == .filled ? .success : order.status == .rejected ? .danger : .waiting, text: order.statusLabel ?? order.status.label) }; Text(order.orderType?.uppercased() ?? "Type indisponible").font(.caption).foregroundStyle(BotaplataColors.textSecondary); row("Quantité demandée", order.requestedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Quantité exécutée", order.executedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Prix limite", FinancialFormatters.money(order.limitPrice)); row("Prix moyen exécuté", FinancialFormatters.money(order.averageFillPrice)); row("Montant exécuté", FinancialFormatters.money(order.executedQuoteAmount)); row("Frais", FinancialFormatters.money(order.feesQuote)); row("PnL net réalisé", FinancialFormatters.money(order.realizedPnLNetQuote) == "—" ? "Indisponible" : FinancialFormatters.money(order.realizedPnLNetQuote)); Text(HistoryPresentation.fullDate(order.filledAt ?? order.updatedAt ?? order.createdAt ?? Date())).font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } } ; func row(_ k: String, _ v: String) -> some View { PremiumKeyValueRow(label: k, value: v, monospaced: true) } }
-struct DecisionRow: View { let decision: SessionDecision; var body: some View { BotaplataCard { VStack(alignment: .leading, spacing: 8) { Text(HistoryPresentation.fullDate(decision.createdAt)).font(.caption).foregroundStyle(BotaplataColors.textSecondary); Text(decision.summaryTitle).font(.headline); Text(decision.summaryMessage).foregroundStyle(BotaplataColors.textSecondary); if let price = decision.price { Text("Prix : \(FinancialFormatters.money(price))").monospacedDigit() }; DisclosureGroup("Voir le détail de l'analyse") { DetailList(title: "Conditions favorables", items: decision.buyConditions); DetailList(title: "Points à vérifier", items: decision.sellConditions + decision.advice.map { [$0] }! ?? []); DetailList(title: "Éléments bloquants", items: decision.blockers); if let s = decision.score { Text("Score technique : \(FinancialFormatters.decimal(s, min: 0, max: 4))").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } } } } }
+struct OrderRow: View {
+    let order: SessionOrder
+    var body: some View {
+        PremiumCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label(order.side.label, systemImage: order.side == .buy ? "arrow.down.left" : "arrow.up.right").font(.headline)
+                    Spacer()
+                    Text(order.provider.displayName).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                }
+                StatusPill(status: order.status == .filled ? .success : order.status == .rejected ? .danger : .waiting,
+                           text: order.status == .open ? "Ouvert · état local" : order.statusLabel ?? order.status.label)
+                Text((order.filledAt ?? order.updatedAt ?? order.createdAt).map(HistoryPresentation.fullDate) ?? "Horodatage non fourni")
+                    .font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                row("Quantité exécutée", order.executedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible")
+                row("Prix moyen exécuté", FinancialFormatters.money(order.averageFillPrice))
+                row("Frais constatés", FinancialFormatters.money(order.feesQuote))
+                row("P&L net réalisé", FinancialFormatters.money(order.realizedPnLNetQuote))
+                DisclosureGroup("Détails de l’ordre") {
+                    row("Type", order.orderType?.uppercased() ?? "Indisponible")
+                    row("Quantité demandée", order.requestedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible")
+                    row("Prix limite", FinancialFormatters.money(order.limitPrice))
+                    row("Montant exécuté", FinancialFormatters.money(order.executedQuoteAmount))
+                    row("Réconciliation", order.reconciliationState ?? "Non fournie")
+                    Text("Statut reçu du backend ; un état local ouvert ne certifie pas que l’ordre est encore ouvert chez Kraken.").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                }
+            }
+        }
+    }
+    private func row(_ label: String, _ value: String) -> some View { PremiumKeyValueRow(label: label, value: value, monospaced: true) }
+}
+struct DecisionRow: View { let decision: SessionDecision; var body: some View { BotaplataCard { VStack(alignment: .leading, spacing: 8) { Text(HistoryPresentation.fullDate(decision.createdAt)).font(.caption).foregroundStyle(BotaplataColors.textSecondary); Text(decision.summaryTitle).font(.headline); Text(decision.summaryMessage).foregroundStyle(BotaplataColors.textSecondary); if let price = decision.price { Text("Prix : \(FinancialFormatters.money(price))").monospacedDigit() }; DisclosureGroup("Voir le détail de l'analyse") { DetailList(title: "Conditions favorables", items: decision.buyConditions); DetailList(title: "Points à vérifier", items: decision.sellConditions + (decision.advice.map { [$0] } ?? [])); DetailList(title: "Éléments bloquants", items: decision.blockers); if let s = decision.score { Text("Score technique : \(FinancialFormatters.decimal(s, min: 0, max: 4))").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } } } } }
 struct DetailList: View { let title: String; let items: [String]; var body: some View { if !items.isEmpty { Text(title).font(.subheadline.weight(.semibold)); ForEach(items, id: \.self) { Text("• \($0)").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } } }
 
 struct SessionChartView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { switch store.charts[session.id] ?? .idle { case .idle, .loading: PremiumSkeletonCard(); case .loaded(let c), .loadedFromCache(let c), .refreshing(let c?), .offline(let c?), .stale(let c): SessionHistoryChartContent(chart: c); case .error: PremiumErrorState(title: "Graphique indisponible", message: "Vérifiez votre connexion puis réessayez."); default: PremiumErrorState(title: "Graphique indisponible", message: "Vérifiez votre connexion puis réessayez.") } }.padding() }.task { await store.refreshChart(sessionID: session.id) }.refreshable { await store.refreshChart(sessionID: session.id) } } }

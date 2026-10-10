@@ -14,11 +14,11 @@ final class ActiveSessionStore {
     private var refreshTask: Task<Void, Never>?; private var pollingTask: Task<Void, Never>?; private var loadTask: Task<Void, Never>?; private var requestGeneration = 0; private var latestGeneratedAt: Date?; private var failures = 0; private var active = false; private var isInBackground = false; private var lastRefreshStartedAt: Date?; private let minimumAutomaticRefreshInterval: TimeInterval = 30
     init(repository: RealActiveSnapshotRepository, cache: ActiveSessionCache, authSession: AuthenticationSession, appState: AppState, clock: AppClock = SystemAppClock()) { self.repository = repository; self.cache = cache; self.authSession = authSession; self.appState = appState; self.clock = clock; BotaplataLog.dashboard.debug("DashboardStore init") }
     func start() { guard !active else { BotaplataLog.dashboard.info("DashboardStore.start skipped reason=skippedAlreadyLoading"); return }; BotaplataLog.dashboard.info("DashboardStore.start reason=initialAppearance"); active = true; isInBackground = false; loadTask = Task { await loadCacheThenRefresh() }; resumePolling() }
-    func stop() { active = false; isInBackground = false; pollingTask?.cancel(); pollingTask = nil; refreshTask?.cancel(); loadTask?.cancel(); loadTask = nil }
+    func stop() { requestGeneration += 1; active = false; isInBackground = false; pollingTask?.cancel(); pollingTask = nil; refreshTask?.cancel(); refreshTask = nil; loadTask?.cancel(); loadTask = nil }
     func purge() async { stop(); content = .idle; latestGeneratedAt = nil; failures = 0; await cache.purge() }
-    func enterBackground() { isInBackground = true; pollingTask?.cancel(); pollingTask = nil; BotaplataLog.dashboard.info("DashboardStore.polling stopped reason=background") }
+    func enterBackground() { isInBackground = true; requestGeneration += 1; refreshTask?.cancel(); refreshTask = nil; loadTask?.cancel(); pollingTask?.cancel(); pollingTask = nil; BotaplataLog.dashboard.info("DashboardStore.polling stopped reason=background") }
     func enterForeground() { guard active else { return }; isInBackground = false; Task { await refresh(reason: .foregroundResume) }; resumePolling() }
-    func loadCacheThenRefresh() async { let signpost = BotaplataSignpost.begin("cache read"); if let cached = await cache.load() { BotaplataLog.dashboard.info("DashboardStore.cache status=hit"); content = .loadedFromCache(cached); latestGeneratedAt = cached.generatedAt } else { BotaplataLog.dashboard.info("DashboardStore.cache status=miss") }; BotaplataSignpost.end("cache read", id: signpost); await refresh(reason: .initialAppearance) }
+    func loadCacheThenRefresh() async { let signpost = BotaplataSignpost.begin("cache read"); let cachedSnapshot = await cache.load(); guard !Task.isCancelled else { return }; if let cached = cachedSnapshot { BotaplataLog.dashboard.info("DashboardStore.cache status=hit"); content = .loadedFromCache(cached); latestGeneratedAt = cached.generatedAt } else { BotaplataLog.dashboard.info("DashboardStore.cache status=miss") }; BotaplataSignpost.end("cache read", id: signpost); await refresh(reason: .initialAppearance) }
     func refresh() async { await refresh(reason: .manualRefresh, force: true) }
     func refresh(reason: DashboardRefreshReason, force: Bool = false) async {
         if let task = refreshTask { BotaplataLog.dashboard.info("DashboardStore.refresh skipped reason=singleFlight"); await task.value; return }
@@ -49,7 +49,7 @@ final class ActiveSessionStore {
             } }
             catch { await MainActor.run { self.apply(error) } }
         }
-        refreshTask = task; await task.value; BotaplataSignpost.end("dashboard load", id: sp); refreshTask = nil; resumePolling()
+        refreshTask = task; await task.value; BotaplataSignpost.end("dashboard load", id: sp); if requestGeneration == generation { refreshTask = nil; resumePolling() }
     }
     @discardableResult private func apply(_ snapshot: RealActiveSnapshot, generation: Int) -> Bool { guard generation >= requestGeneration else { return false }; if let old = latestGeneratedAt, let new = snapshot.generatedAt, new < old { return false }; latestGeneratedAt = snapshot.generatedAt; failures = 0; content = .loaded(snapshot); return true }
     private func apply(_ error: Error) { failures += 1; let message: String; if let auth = error as? AuthenticationError { message = auth.dashboardMessage } else { message = "Impossible de charger le snapshot." }; if let visible = visibleSnapshot { content = .offline(visible) } else { content = .error(message) } }

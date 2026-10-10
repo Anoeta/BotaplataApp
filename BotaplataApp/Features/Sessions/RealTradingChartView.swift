@@ -271,6 +271,7 @@ struct RealTradingChartSection: View {
     let session: SessionDetail
     @Environment(RealSessionChartStore.self) private var store
 
+    @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         RealTradingChartView(
             state: store.state,
@@ -278,7 +279,7 @@ struct RealTradingChartSection: View {
             select: { store.selectRange($0, sessionID: session.id) },
             refresh: { store.refresh(sessionID: session.id) }
         )
-        .task(id: session.id) { store.load(sessionID: session.id) }
+        .task(id: "\(session.id):\(scenePhase == .active)") { if scenePhase == .active { store.load(sessionID: session.id) } else { store.stop() } }
         .onDisappear { store.stop() }
         .refreshable { store.refresh(sessionID: session.id) }
     }
@@ -397,18 +398,19 @@ struct RealTradingChartView: View {
 struct ChartRangeSelector: View {
     let selected: TradingChartRange
     let select: (TradingChartRange) -> Void
-
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body: some View {
-        HStack(spacing: BotaplataSpacing.sm) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4), spacing: 4) {
             ForEach(TradingChartRange.allCases, id: \.self) { range in
-                Button(range.displayTitle) {
-                    select(range)
+                Button { select(range) } label: {
+                    Text(range.displayTitle).font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .foregroundStyle(range == selected ? BotaplataColors.textPrimary : BotaplataColors.textSecondary)
+                        .background(range == selected ? BotaplataColors.primaryTeal.opacity(0.16) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(range == selected ? BotaplataColors.primaryTeal : BotaplataColors.elevated)
-                .accessibilityLabel(
-                    "Période \(range.displayTitle), \(range == selected ? "sélectionnée" : "non sélectionnée")"
-                )
+                .buttonStyle(.plain)
+                .accessibilityLabel("Période \(range.displayTitle)")
+                .accessibilityAddTraits(range == selected ? .isSelected : [])
             }
         }
     }

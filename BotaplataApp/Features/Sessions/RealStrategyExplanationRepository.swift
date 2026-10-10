@@ -2,7 +2,6 @@ import Foundation
 import Observation
 import OSLog
 
-protocol RealStrategyExplanationRepository: Sendable { func fetchStrategyExplanation(sessionID: String, accessToken: String) async throws -> StrategyExplanation }
 struct RemoteRealStrategyExplanationRepository: RealStrategyExplanationRepository { let client: APIClientProtocol
     func fetchStrategyExplanation(sessionID: String, accessToken: String) async throws -> StrategyExplanation {
         BotaplataLog.strategyExplanation.info("StrategyExplanationRepository.fetch session=\(sessionID, privacy: .public)")
@@ -21,4 +20,4 @@ struct RemoteRealStrategyExplanationRepository: RealStrategyExplanationRepositor
     }
 }
 struct UnconfiguredRealStrategyExplanationRepository: RealStrategyExplanationRepository { func fetchStrategyExplanation(sessionID: String, accessToken: String) async throws -> StrategyExplanation { throw AuthenticationError.notConfigured } }
-struct MockRealStrategyExplanationRepository: RealStrategyExplanationRepository { var explanation: StrategyExplanation = PreviewFixtures.strategyExplanationWait3; func fetchStrategyExplanation(sessionID: String, accessToken: String) async throws -> StrategyExplanation { explanation } }
+struct MockRealStrategyExplanationRepository: RealStrategyExplanationRepository { var explanation: StrategyExplanation = PreviewFixtures.strategyExplanationWait3; func fetchStrategyExplanation(sessionID: String, accessToken: String) async throws -> StrategyExplanation { StrategyExplanation(sessionID: sessionID, strategy: explanation.strategy, decision: explanation.decision, score: explanation.score, analysis: explanation.analysis, market: explanation.market, conditions: explanation.conditions, blockers: explanation.blockers, indicators: explanation.indicators, positionProtection: explanation.positionProtection, warnings: explanation.warnings, meta: explanation.meta) } }

@@ -21,12 +21,43 @@ actor FakeChartRepository: RealSessionChartRepositoryProtocol {
 @MainActor final class RealSessionChartStoreTests: XCTestCase {
     private func store(_ repo: FakeChartRepository, now: @escaping () -> Date = { Date(timeIntervalSince1970: 100) }) -> RealSessionChartStore { RealSessionChartStore(repository: repo, authorize: { work in try await work("token") }, now: now) }
     private func wait() async { try? await Task.sleep(nanoseconds: 80_000_000) }
+    func testWrongSessionResponseBecomesContractError() async {
+        let repo = FakeChartRepository()
+        await repo.setResult(.success(FakeChartRepository.chart(sessionID: "wrong")), sessionID: "s1")
+        let sut = store(repo)
+        sut.load(sessionID: "s1")
+        await wait()
+        XCTAssertEqual(sut.state, .failed(.contractIncompatible))
+    }
+    func testReturningToCachedRangeCancelsPendingRequest() async {
+        let repo = FakeChartRepository()
+        await repo.setDelay(50_000_000)
+        let sut = store(repo)
+        sut.seedCache(chart: FakeChartRepository.chart(range: .sixHours), fetchedAt: Date(timeIntervalSince1970: 99))
+        sut.selectRange(.oneHour, sessionID: "s1")
+        sut.selectRange(.sixHours, sessionID: "s1")
+        await wait()
+        XCTAssertEqual(sut.chart?.range, .sixHours)
+        sut.selectRange(.oneHour, sessionID: "s1")
+        await wait()
+        XCTAssertEqual(sut.chart?.range, .oneHour)
+    }
+    func testPurgeRemovesChartsAndDate() async {
+        let sut = store(FakeChartRepository())
+        sut.seedCache(chart: FakeChartRepository.chart(), fetchedAt: Date(timeIntervalSince1970: 99))
+        sut.load(sessionID: "s1")
+        sut.purge()
+        XCTAssertEqual(sut.cacheCount, 0)
+        XCTAssertNil(sut.chart)
+        XCTAssertNil(sut.lastUpdated)
+        XCTAssertEqual(sut.state, .idle)
+    }
     func testLoadingIdleToLoaded() async { let repo = FakeChartRepository(); let sut = store(repo); XCTAssertEqual(sut.state, .idle); sut.load(sessionID: "s1"); if case .loading = sut.state {} else { XCTFail() }; await wait(); if case .loaded(let chart) = sut.state { XCTAssertEqual(chart.range, .sixHours) } else { XCTFail("not loaded") } }
-    func testValidCacheAvoidsRequest() async { let repo = FakeChartRepository(); let sut = store(repo); sut.seedCache(chart: FakeChartRepository.chart(), fetchedAt: Date(timeIntervalSince1970: 95)); sut.load(sessionID: "s1"); await wait(); XCTAssertEqual(await repo.callCount(), 0); if case .loaded(let chart) = sut.state { XCTAssertEqual(chart.sessionID, "s1") } else { XCTFail() } }
-    func testExpiredCacheRefreshesAndReplaces() async { let repo = FakeChartRepository(); let sut = store(repo, now: { Date(timeIntervalSince1970: 500) }); sut.seedCache(chart: FakeChartRepository.chart(), fetchedAt: Date(timeIntervalSince1970: 0)); sut.load(sessionID: "s1"); if case .refreshing = sut.state {} else { XCTFail() }; await wait(); XCTAssertEqual(await repo.callCount(), 1) }
-    func testChangingRangeUsesDistinctCacheKey() async { let repo = FakeChartRepository(); let sut = store(repo); sut.seedCache(chart: FakeChartRepository.chart(range: .sixHours), fetchedAt: Date(timeIntervalSince1970: 99)); sut.selectRange(.oneHour, sessionID: "s1"); await wait(); XCTAssertEqual(await repo.ranges(), [.oneHour]); if case .loaded(let chart) = sut.state { XCTAssertEqual(chart.range, .oneHour) } else { XCTFail() } }
+    func testValidCacheAvoidsRequest() async { let repo = FakeChartRepository(); let sut = store(repo); sut.seedCache(chart: FakeChartRepository.chart(), fetchedAt: Date(timeIntervalSince1970: 95)); sut.load(sessionID: "s1"); await wait(); let awaitedValue34 = await repo.callCount(); XCTAssertEqual(awaitedValue34, 0); if case .loaded(let chart) = sut.state { XCTAssertEqual(chart.sessionID, "s1") } else { XCTFail() } }
+    func testExpiredCacheRefreshesAndReplaces() async { let repo = FakeChartRepository(); let sut = store(repo, now: { Date(timeIntervalSince1970: 500) }); sut.seedCache(chart: FakeChartRepository.chart(), fetchedAt: Date(timeIntervalSince1970: 0)); sut.load(sessionID: "s1"); if case .refreshing = sut.state {} else { XCTFail() }; await wait(); let awaitedValue35 = await repo.callCount(); XCTAssertEqual(awaitedValue35, 1) }
+    func testChangingRangeUsesDistinctCacheKey() async { let repo = FakeChartRepository(); let sut = store(repo); sut.seedCache(chart: FakeChartRepository.chart(range: .sixHours), fetchedAt: Date(timeIntervalSince1970: 99)); sut.selectRange(.oneHour, sessionID: "s1"); await wait(); let awaitedValue36 = await repo.ranges(); XCTAssertEqual(awaitedValue36, [.oneHour]); if case .loaded(let chart) = sut.state { XCTAssertEqual(chart.range, .oneHour) } else { XCTFail() } }
     func testRapidTapsOnlyFinalResultApplies() async { let repo = FakeChartRepository(); await repo.setDelay(40_000_000); let sut = store(repo); sut.selectRange(.oneHour, sessionID: "s1"); sut.selectRange(.oneDay, sessionID: "s1"); sut.selectRange(.sevenDays, sessionID: "s1"); await wait(); if case .loaded(let chart) = sut.state { XCTAssertEqual(chart.range, .sevenDays) } else { XCTFail() } }
-    func testSingleFlight() async { let repo = FakeChartRepository(); await repo.setDelay(50_000_000); let sut = store(repo); sut.load(sessionID: "s1"); sut.load(sessionID: "s1"); await wait(); XCTAssertEqual(await repo.callCount(), 1) }
+    func testSingleFlight() async { let repo = FakeChartRepository(); await repo.setDelay(50_000_000); let sut = store(repo); sut.load(sessionID: "s1"); sut.load(sessionID: "s1"); await wait(); let awaitedValue37 = await repo.callCount(); XCTAssertEqual(awaitedValue37, 1) }
     func testOfflineWithCacheAndWithoutCache() async { let repo = FakeChartRepository(); await repo.setResult(.failure(AuthenticationError.offline)); let sut = store(repo, now: { Date(timeIntervalSince1970: 500) }); sut.seedCache(chart: FakeChartRepository.chart(), fetchedAt: Date(timeIntervalSince1970: 0)); sut.refresh(sessionID: "s1"); await wait(); if case .offline = sut.state {} else { XCTFail() }; let empty = store(repo); empty.load(sessionID: "s1"); await wait(); XCTAssertEqual(empty.state, .failed(.networkUnavailable)) }
     func testContractIncompatibleKeepsCache() async { let repo = FakeChartRepository(); await repo.setResult(.failure(AuthenticationError.contractIncompatible)); let sut = store(repo, now: { Date(timeIntervalSince1970: 500) }); sut.seedCache(chart: FakeChartRepository.chart(), fetchedAt: .distantPast); sut.refresh(sessionID: "s1"); await wait(); if case .offline(let chart) = sut.state { XCTAssertEqual(chart.sessionID, "s1") } else { XCTFail() } }
     func testEmptySeriesValidLoadedWithWarning() async { let repo = FakeChartRepository(); let warning = Warning(id: "w", severity: .warning, title: "title", message: "chart_price_series_unavailable"); await repo.setResult(.success(FakeChartRepository.chart(candles: [], warnings: [warning]))); let sut = store(repo); sut.load(sessionID: "s1"); await wait(); if case .loaded(let chart) = sut.state { XCTAssertTrue(chart.candles.isEmpty); XCTAssertEqual(chart.warnings.first?.message, "chart_price_series_unavailable") } else { XCTFail() } }

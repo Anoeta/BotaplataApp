@@ -8,6 +8,7 @@ struct RootView: View {
     @Environment(RealSessionsStore.self) private var realSessionsStore
     @Environment(RealSessionHistoryStore.self) private var realSessionHistoryStore
     @Environment(RealStrategyExplanationStore.self) private var strategyExplanationStore
+    @Environment(RealSessionChartStore.self) private var chartStore
     @Environment(ProfileStore.self) private var profileStore
     @Environment(PushNotificationsStore.self) private var pushStore
     @Environment(\.scenePhase) private var scenePhase
@@ -49,7 +50,7 @@ struct RootView: View {
             }
         }
         .onChange(of: appState.sessionState) { _, newState in
-            if [.loggedOut, .revoked, .expired].contains(newState) { Task { await activeSessionStore.purge(); await realSessionsStore.purge(); await realSessionHistoryStore.purge(); await pushStore.purge(); profileStore.purge() } }
+            if [.loggedOut, .revoked, .expired].contains(newState) { Task { await activeSessionStore.purge(); await realSessionsStore.purge(); await realSessionHistoryStore.purge(); await pushStore.purge(); profileStore.purge(); chartStore.purge(); strategyExplanationStore.purge() } }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { didEnterBackground = true }

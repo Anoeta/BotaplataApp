@@ -2,26 +2,41 @@ import SwiftUI
 
 struct PremiumBackground: View {
     var body: some View {
-        ZStack {
-            BotaplataGradients.appBackground
-            Circle().fill(BotaplataColors.primaryTeal.opacity(0.18)).frame(width: 260, height: 260).blur(radius: 42).offset(x: 150, y: -260)
-            Circle().fill(BotaplataColors.backgroundNavy.opacity(0.38)).frame(width: 340, height: 340).blur(radius: 54).offset(x: -170, y: 230)
-        }
+        BotaplataColors.background
         .ignoresSafeArea()
         .accessibilityHidden(true)
     }
 }
 
-enum PremiumCardVariant { case normal, elevated, success, warning, danger, hero
-    var gradient: LinearGradient { switch self { case .normal: LinearGradient(colors: [BotaplataColors.cardGlass, BotaplataColors.backgroundElevated.opacity(0.56)], startPoint: .topLeading, endPoint: .bottomTrailing); case .elevated: LinearGradient(colors: [Color.white.opacity(0.11), BotaplataColors.backgroundElevated.opacity(0.76)], startPoint: .topLeading, endPoint: .bottomTrailing); case .success: BotaplataGradients.cardTeal; case .warning: BotaplataGradients.cardWarning; case .danger: BotaplataGradients.cardDanger; case .hero: BotaplataGradients.cardHero } }
-    var glow: Color { switch self { case .success, .hero: BotaplataShadow.glowTeal; case .warning: BotaplataColors.warning.opacity(0.14); case .danger: BotaplataShadow.dangerGlow; default: BotaplataShadow.cardColor } }
+enum PremiumCardVariant {
+    case normal, elevated, success, warning, danger, hero
+    var border: Color {
+        switch self {
+        case .warning: BotaplataColors.warning.opacity(0.4)
+        case .danger: BotaplataColors.danger.opacity(0.4)
+        case .success, .hero: BotaplataColors.primaryTeal.opacity(0.25)
+        default: BotaplataColors.cardBorder
+        }
+    }
 }
 
 struct PremiumCard<Content: View>: View {
     let variant: PremiumCardVariant
-    @ViewBuilder var content: Content
-    init(variant: PremiumCardVariant = .normal, @ViewBuilder content: () -> Content) { self.variant = variant; self.content = content() }
-    var body: some View { content.foregroundStyle(BotaplataColors.textPrimary).padding(BotaplataSpacing.md).frame(maxWidth: .infinity, alignment: .leading).background(variant.gradient, in: RoundedRectangle(cornerRadius: BotaplataRadius.lg, style: .continuous)).overlay(alignment: .topLeading) { RoundedRectangle(cornerRadius: BotaplataRadius.lg, style: .continuous).stroke(BotaplataColors.cardBorder, lineWidth: BotaplataBorder.subtle) }.shadow(color: variant.glow, radius: BotaplataShadow.radius, x: 0, y: BotaplataShadow.y) }
+    let content: Content
+    init(variant: PremiumCardVariant = .normal, @ViewBuilder content: () -> Content) {
+        self.variant = variant; self.content = content()
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { content }
+            .foregroundStyle(BotaplataColors.textPrimary)
+            .padding(BotaplataSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(BotaplataColors.card, in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous)
+                    .stroke(variant.border, lineWidth: 1)
+            }
+    }
 }
 
 struct GlassCard<Content: View>: View { @ViewBuilder var content: Content; var body: some View { PremiumCard(variant: .elevated) { content } } }
@@ -34,7 +49,7 @@ struct MetricCard: View {
 }
 
 enum BadgeStatus { case active, waiting, success, warning, danger, neutral; var color: Color { switch self { case .active: BotaplataColors.primaryTeal; case .waiting: BotaplataColors.accentCyan; case .success: BotaplataColors.success; case .warning: BotaplataColors.warning; case .danger: BotaplataColors.danger; case .neutral: BotaplataColors.neutral } }; var icon: String { switch self { case .active: "dot.radiowaves.left.and.right"; case .waiting: "clock"; case .success: BotaplataSymbol.success; case .warning: BotaplataSymbol.warning; case .danger: BotaplataSymbol.critical; case .neutral: "circle" } } }
-struct StatusPill: View { let status: BadgeStatus; let text: String; var accessibilityText: String? = nil; var body: some View { Label(text, systemImage: status.icon).font(.caption.weight(.semibold)).lineLimit(1).padding(.horizontal, 11).padding(.vertical, 7).foregroundStyle(status.color).background(status.color.opacity(0.16), in: Capsule()).overlay(Capsule().stroke(status.color.opacity(0.34), lineWidth: 1)).accessibilityElement(children: .ignore).accessibilityLabel(accessibilityText ?? text) } }
+struct StatusPill: View { let status: BadgeStatus; let text: String; var accessibilityText: String? = nil; var body: some View { Label(text, systemImage: status.icon).font(.caption.weight(.semibold)).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 11).padding(.vertical, 7).foregroundStyle(status.color).background(status.color.opacity(0.16), in: Capsule()).overlay(Capsule().stroke(status.color.opacity(0.34), lineWidth: 1)).accessibilityElement(children: .ignore).accessibilityLabel(accessibilityText ?? text) } }
 struct StatusBadge: View { let status: BadgeStatus; let text: String; var body: some View { StatusPill(status: status, text: text) } }
 struct FilterPill: View { let title: String; var isSelected: Bool; var body: some View { Text(title).font(.caption.weight(.semibold)).padding(.horizontal, 14).padding(.vertical, 8).foregroundStyle(isSelected ? BotaplataColors.backgroundDeep : BotaplataColors.textSecondary).background(isSelected ? AnyShapeStyle(BotaplataGradients.buttonPrimary) : AnyShapeStyle(BotaplataColors.cardGlass), in: Capsule()).overlay(Capsule().stroke(BotaplataColors.cardBorder, lineWidth: 1)).accessibilityAddTraits(isSelected ? .isSelected : []) } }
 struct LiveBadge: View { var body: some View { StatusPill(status: .active, text: "LIVE", accessibilityText: "LIVE, session en cours") } }
@@ -48,7 +63,7 @@ struct PremiumPrimaryButton: View { let title: String; var isLoading = false; va
 struct PremiumSecondaryButton: View { let title: String; var action: () -> Void; var body: some View { Button(title, action: action).buttonStyle(PremiumSecondaryButtonStyle()) } }
 struct PremiumDangerButton: View { let title: String; var action: () -> Void; var body: some View { Button(title, action: action).buttonStyle(PremiumDangerButtonStyle()) } }
 struct IconTextButton: View { let title: String; let systemImage: String; var action: () -> Void; var body: some View { Button(action: action) { Label(title, systemImage: systemImage).frame(maxWidth: .infinity, minHeight: BotaplataTouch.minimum) }.buttonStyle(PremiumSecondaryButtonStyle()) } }
-struct PremiumPrimaryButtonStyle: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.padding(.horizontal, BotaplataSpacing.md).foregroundStyle(BotaplataColors.backgroundDeep).background(BotaplataGradients.buttonPrimary.opacity(configuration.isPressed ? 0.78 : 1), in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous)).opacity(configuration.isPressed ? 0.88 : 1) } }
+struct PremiumPrimaryButtonStyle: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.padding(.horizontal, BotaplataSpacing.md).foregroundStyle(Color(uiColor: .systemBackground)).background(BotaplataGradients.buttonPrimary.opacity(configuration.isPressed ? 0.78 : 1), in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous)).opacity(configuration.isPressed ? 0.88 : 1) } }
 struct PremiumSecondaryButtonStyle: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.font(.headline).padding(.horizontal, BotaplataSpacing.md).frame(minHeight: BotaplataTouch.minimum).foregroundStyle(BotaplataColors.textPrimary).background(BotaplataColors.cardGlass.opacity(configuration.isPressed ? 0.55 : 1), in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous)).overlay(RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous).stroke(BotaplataColors.cardBorder, lineWidth: 1)) } }
 struct PremiumDangerButtonStyle: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label.font(.headline).padding(.horizontal, BotaplataSpacing.md).frame(maxWidth: .infinity, minHeight: BotaplataTouch.minimum).foregroundStyle(.white).background(BotaplataColors.danger.opacity(configuration.isPressed ? 0.70 : 0.92), in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous)) } }
 
