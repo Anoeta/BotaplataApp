@@ -11,9 +11,9 @@ final class ActiveSessionStoreTests: XCTestCase {
         await harness.repo.waitForCalls(1)
         await harness.repo.finishNext()
         await harness.clock.waitForSleepCount(2)
-        XCTAssertEqual(await harness.cache.loadCount, 1)
-        XCTAssertEqual(await harness.repo.callCount, 1)
-        XCTAssertEqual(await harness.clock.sleepCount, 2)
+        let awaitedValue7 = await harness.cache.loadCount; XCTAssertEqual(awaitedValue7, 1)
+        let awaitedValue8 = await harness.repo.callCount; XCTAssertEqual(awaitedValue8, 1)
+        let awaitedValue9 = await harness.clock.sleepCount; XCTAssertEqual(awaitedValue9, 2)
         harness.store.stop()
     }
 
@@ -49,10 +49,10 @@ final class ActiveSessionStoreTests: XCTestCase {
         async let second: Void = harness.store.refresh()
         async let third: Void = harness.store.refresh()
         await harness.repo.waitForCalls(1)
-        XCTAssertEqual(await harness.repo.callCount, 1)
+        let awaitedValue10 = await harness.repo.callCount; XCTAssertEqual(awaitedValue10, 1)
         await harness.repo.finishNext()
         _ = await (first, second, third)
-        XCTAssertEqual(await harness.repo.callCount, 1)
+        let awaitedValue11 = await harness.repo.callCount; XCTAssertEqual(awaitedValue11, 1)
         harness.store.stop()
     }
 
@@ -64,7 +64,7 @@ final class ActiveSessionStoreTests: XCTestCase {
         harness.store.stop()
         await harness.clock.resumeAll()
         await shortYield()
-        XCTAssertEqual(await harness.repo.callCount, 1)
+        let awaitedValue12 = await harness.repo.callCount; XCTAssertEqual(awaitedValue12, 1)
     }
 
     func testEnterBackgroundCancelsPollingAndKeepsVisibleSnapshot() async {
@@ -75,7 +75,7 @@ final class ActiveSessionStoreTests: XCTestCase {
         await harness.clock.waitForSleepCount(2)
         harness.store.enterBackground()
         await harness.clock.resumeAll(); await shortYield()
-        XCTAssertEqual(await harness.repo.callCount, 1)
+        let awaitedValue13 = await harness.repo.callCount; XCTAssertEqual(awaitedValue13, 1)
         XCTAssertVisible(harness.store.content, visible)
         harness.store.stop()
     }
@@ -83,7 +83,7 @@ final class ActiveSessionStoreTests: XCTestCase {
     func testEnterForegroundRefreshesAndResumesOnePollingLoopOnlyWhenStarted() async {
         let harness = await Harness()
         harness.store.enterForeground(); await shortYield()
-        XCTAssertEqual(await harness.repo.callCount, 0)
+        let awaitedValue14 = await harness.repo.callCount; XCTAssertEqual(awaitedValue14, 0)
 
         await harness.repo.enqueue(.success(snapshot("start", at: 1)))
         harness.store.start(); await harness.repo.waitForCalls(1); await harness.repo.finishNext()
@@ -91,7 +91,7 @@ final class ActiveSessionStoreTests: XCTestCase {
         await harness.repo.enqueue(.success(snapshot("foreground", at: 2)))
         harness.store.enterForeground(); await harness.repo.waitForCalls(2); await harness.repo.finishNext()
         await harness.clock.waitForSleepCount(3)
-        XCTAssertEqual(await harness.repo.callCount, 2)
+        let awaitedValue15 = await harness.repo.callCount; XCTAssertEqual(awaitedValue15, 2)
         harness.store.stop()
     }
 
@@ -125,10 +125,10 @@ final class ActiveSessionStoreTests: XCTestCase {
         let newer = snapshot("newer", at: 10), older = snapshot("older", at: 5)
         let harness = await Harness()
         await harness.repo.enqueue(.success(newer)); await runRefresh(harness)
-        XCTAssertEqual(await harness.cache.saveCount, 1)
+        let awaitedValue16 = await harness.cache.saveCount; XCTAssertEqual(awaitedValue16, 1)
         await harness.repo.enqueue(.success(older)); await runRefresh(harness)
         XCTAssertVisible(harness.store.content, newer)
-        XCTAssertEqual(await harness.cache.saveCount, 1)
+        let awaitedValue17 = await harness.cache.saveCount; XCTAssertEqual(awaitedValue17, 1)
         harness.store.stop()
     }
 
@@ -157,9 +157,9 @@ final class ActiveSessionStoreTests: XCTestCase {
         await harness.repo.waitForCalls(2)
         await harness.repo.finishNext()
         await task.value
-        XCTAssertEqual(await harness.repo.callCount, 2)
-        XCTAssertEqual(await harness.repo.tokens, ["old", "new"])
-        XCTAssertEqual(await harness.authRepo.refreshCount, 1)
+        let awaitedValue18 = await harness.repo.callCount; XCTAssertEqual(awaitedValue18, 2)
+        let awaitedValue19 = await harness.repo.tokens; XCTAssertEqual(awaitedValue19, ["old", "new"])
+        let awaitedValue20 = await harness.authRepo.refreshCount; XCTAssertEqual(awaitedValue20, 1)
         harness.store.stop()
     }
 
@@ -173,8 +173,8 @@ final class ActiveSessionStoreTests: XCTestCase {
         await harness.repo.waitForCalls(2)
         await harness.repo.finishNext()
         await task.value
-        XCTAssertEqual(await harness.repo.callCount, 2)
-        XCTAssertEqual(await harness.authRepo.refreshCount, 1)
+        let awaitedValue21 = await harness.repo.callCount; XCTAssertEqual(awaitedValue21, 2)
+        let awaitedValue22 = await harness.authRepo.refreshCount; XCTAssertEqual(awaitedValue22, 1)
         XCTAssertEqual(harness.appState.sessionState, .expired)
         harness.store.stop()
     }
@@ -184,7 +184,7 @@ final class ActiveSessionStoreTests: XCTestCase {
         await harness.repo.enqueue(.failure(AuthenticationError.deviceRevoked))
         await runRefresh(harness)
         XCTAssertEqual(harness.appState.sessionState, .revoked)
-        XCTAssertEqual(await harness.authRepo.refreshCount, 0)
+        let awaitedValue23 = await harness.authRepo.refreshCount; XCTAssertEqual(awaitedValue23, 0)
         harness.store.stop()
     }
 
@@ -195,9 +195,9 @@ final class ActiveSessionStoreTests: XCTestCase {
         await harness.store.purge()
         await harness.repo.finishNext(); await harness.clock.resumeAll(); await shortYield()
         if case .idle = harness.store.content {} else { XCTFail("Expected idle after purge") }
-        XCTAssertEqual(await harness.cache.purgeCount, 1)
-        XCTAssertEqual(await harness.cache.saveCount, 0)
-        XCTAssertEqual(await harness.repo.callCount, 1)
+        let awaitedValue24 = await harness.cache.purgeCount; XCTAssertEqual(awaitedValue24, 1)
+        let awaitedValue25 = await harness.cache.saveCount; XCTAssertEqual(awaitedValue25, 0)
+        let awaitedValue26 = await harness.repo.callCount; XCTAssertEqual(awaitedValue26, 1)
     }
 
     func testStopDuringRefreshCancelsWithoutUserErrorCacheSaveOrPollingResume() async {
@@ -208,8 +208,8 @@ final class ActiveSessionStoreTests: XCTestCase {
         harness.store.stop()
         await harness.repo.finishNext(); await task.value; await shortYield()
         if case .loading = harness.store.content {} else { XCTFail("Expected no artificial user error") }
-        XCTAssertEqual(await harness.cache.saveCount, 0)
-        XCTAssertEqual(await harness.clock.sleepCount, 0)
+        let awaitedValue27 = await harness.cache.saveCount; XCTAssertEqual(awaitedValue27, 0)
+        let awaitedValue28 = await harness.clock.sleepCount; XCTAssertEqual(awaitedValue28, 0)
     }
 }
 

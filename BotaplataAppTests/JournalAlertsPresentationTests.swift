@@ -7,7 +7,7 @@ final class JournalAlertsPresentationTests: XCTestCase {
         XCTAssertEqual(JournalEventPresentation.make(from: event(.buySubmitted)).category, .orders)
         XCTAssertEqual(JournalEventPresentation.make(from: event(.positionOpened)).category, .positions)
         XCTAssertEqual(JournalEventPresentation.make(from: event(.monitoringDegraded)).category, .system)
-        XCTAssertEqual(JournalEventPresentation.make(from: event(.decisionRecorded)).title, "Décision recalculée")
+        XCTAssertEqual(JournalEventPresentation.make(from: event(.decisionRecorded)).title, "Décision enregistrée")
     }
 
     func testOrderStatusesStayPedagogicallyDistinct() {

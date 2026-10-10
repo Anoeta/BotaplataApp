@@ -37,7 +37,17 @@ struct StrategyExplanationDecisionDTO: Decodable, Sendable {
   enum CodingKeys: String, CodingKey {
     case code, label, summary, status
     case technicalDetail = "technical_detail"
+    case technicalReason = "technical_reason"
     case decidedAt = "decided_at"
+  }
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    code = try c.decode(String.self, forKey: .code)
+    label = try c.decode(String.self, forKey: .label)
+    summary = try c.decode(String.self, forKey: .summary)
+    technicalDetail = try c.decodeIfPresent(String.self, forKey: .technicalDetail) ?? c.decodeIfPresent(String.self, forKey: .technicalReason)
+    status = try c.decodeIfPresent(String.self, forKey: .status)
+    decidedAt = try c.decodeIfPresent(Date.self, forKey: .decidedAt)
   }
 }
 struct FlexibleIntDTO: Decodable, Sendable {
@@ -96,10 +106,26 @@ struct StrategyExplanationAnalysisDTO: Decodable, Sendable {
   let technicalDetail: String?
   enum CodingKeys: String, CodingKey {
     case timeframe, freshness, summary
+    case decisionTimeframe = "decision_timeframe"
+    case isStale = "is_stale"
     case candleCloseTime = "candle_close_time"
     case calculatedAt = "calculated_at"
     case nextRecalculationAt = "next_recalculation_at"
     case technicalDetail = "technical_detail"
+  }
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    timeframe = try c.decodeIfPresent(String.self, forKey: .decisionTimeframe) ?? c.decodeIfPresent(String.self, forKey: .timeframe)
+    candleCloseTime = try c.decodeIfPresent(Date.self, forKey: .candleCloseTime)
+    calculatedAt = try c.decodeIfPresent(Date.self, forKey: .calculatedAt)
+    nextRecalculationAt = try c.decodeIfPresent(Date.self, forKey: .nextRecalculationAt)
+    summary = try c.decodeIfPresent(String.self, forKey: .summary)
+    technicalDetail = try c.decodeIfPresent(String.self, forKey: .technicalDetail)
+    if let nested = try c.decodeIfPresent(StrategyExplanationFreshnessDTO.self, forKey: .freshness) {
+      freshness = nested
+    } else if let stale = try c.decodeIfPresent(Bool.self, forKey: .isStale) {
+      freshness = StrategyExplanationFreshnessDTO(status: stale ? "stale" : "fresh", label: stale ? "Ancienne" : "Récente", summary: nil, isStale: stale)
+    } else { freshness = nil }
   }
 }
 struct StrategyExplanationFreshnessDTO: Decodable, Sendable {
@@ -198,7 +224,7 @@ struct StrategyExplanationIndicatorDTO: Decodable, Sendable {
   let summary: String?
   let technicalDetail: String?
   enum CodingKeys: String, CodingKey {
-    case value, label, status, summary
+    case value, label, status, summary, upper, middle, lower
     case technicalDetail = "technical_detail"
   }
 
@@ -212,7 +238,13 @@ struct StrategyExplanationIndicatorDTO: Decodable, Sendable {
 
   init(from decoder: Decoder) throws {
     if let c = try? decoder.container(keyedBy: CodingKeys.self) {
-      value = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .value)?.value
+      let scalar = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .value)?.value
+      let bands: [(String, CodingKeys)] = [("Basse", .lower), ("Médiane", .middle), ("Haute", .upper)]
+      let bandValues = try bands.compactMap { label, key -> String? in
+        guard let raw = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: key)?.value else { return nil }
+        return "\(label) \(raw)"
+      }
+      value = scalar ?? (bandValues.isEmpty ? nil : bandValues.joined(separator: " · "))
       label = try c.decodeIfPresent(String.self, forKey: .label)
       status = try c.decodeIfPresent(String.self, forKey: .status)
       summary = try c.decodeIfPresent(String.self, forKey: .summary)
@@ -242,12 +274,28 @@ struct StrategyExplanationPositionProtectionDTO: Decodable, Sendable {
     case entryPrice = "entry_price"
     case currentPrice = "current_price"
     case unrealizedPnL = "unrealized_pnl"
+    case unrealizedPnLQuote = "unrealized_pnl_quote"
     case breakEvenPrice = "break_even_price"
     case minimumProfitablePrice = "minimum_profitable_price"
+    case minimumProfitableExitPrice = "minimum_profitable_exit_price"
     case trailingActive = "trailing_active"
     case trailingStop = "trailing_stop"
+    case trailingStopPrice = "trailing_stop_price"
     case sellConditions = "sell_conditions"
     case technicalDetail = "technical_detail"
+  }
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    summary = try c.decode(String.self, forKey: .summary)
+    entryPrice = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .entryPrice)?.value
+    currentPrice = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .currentPrice)?.value
+    unrealizedPnL = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .unrealizedPnLQuote)?.value ?? c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .unrealizedPnL)?.value
+    breakEvenPrice = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .breakEvenPrice)?.value
+    minimumProfitablePrice = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .minimumProfitableExitPrice)?.value ?? c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .minimumProfitablePrice)?.value
+    trailingActive = try c.decodeIfPresent(Bool.self, forKey: .trailingActive)
+    trailingStop = try c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .trailingStopPrice)?.value ?? c.decodeIfPresent(FlexibleStringValueDTO.self, forKey: .trailingStop)?.value
+    sellConditions = try c.decodeIfPresent([String].self, forKey: .sellConditions) ?? []
+    technicalDetail = try c.decodeIfPresent(String.self, forKey: .technicalDetail)
   }
 }
 struct StrategyExplanationWarningDTO: Decodable, Sendable {
@@ -255,6 +303,14 @@ struct StrategyExplanationWarningDTO: Decodable, Sendable {
   let severity: String
   let title: String
   let message: String
+  enum CodingKeys: String, CodingKey { case id, code, severity, title, message }
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decodeIfPresent(String.self, forKey: .id) ?? c.decode(String.self, forKey: .code)
+    severity = try c.decodeIfPresent(String.self, forKey: .severity) ?? (id == "stale_strategy_decision" ? "warning" : "info")
+    title = try c.decodeIfPresent(String.self, forKey: .title) ?? (id == "stale_strategy_decision" ? "Analyse ancienne" : "Information Botaplata")
+    message = try c.decode(String.self, forKey: .message)
+  }
 }
 struct StrategyExplanationMetaDTO: Decodable, Sendable {
   let requestID: String?

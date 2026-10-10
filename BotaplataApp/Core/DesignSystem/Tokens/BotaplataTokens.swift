@@ -2,33 +2,33 @@ import SwiftUI
 import UIKit
 
 enum BotaplataColors {
-    // Lovable-inspired Premium V2 palette for native SwiftUI dark mode.
-    static let backgroundDeep = Color(red: 0.01, green: 0.03, blue: 0.07)
-    static let backgroundNavy = Color(red: 0.00, green: 0.22, blue: 0.51)
-    static let backgroundElevated = Color(red: 0.06, green: 0.11, blue: 0.19)
-    static let cardGlass = Color.white.opacity(0.105)
-    static let cardBorder = Color.white.opacity(0.22)
-    static let primaryMint = Color(red: 0.37, green: 0.80, blue: 0.54)
-    static let primaryTeal = Color(red: 0.00, green: 0.60, blue: 0.55)
-    static let accentCyan = Color(red: 0.07, green: 0.63, blue: 0.83)
-    static let accentMagenta = Color(red: 0.65, green: 0.15, blue: 0.44)
-    static let success = primaryMint
-    static let warning = Color(red: 0.98, green: 0.71, blue: 0.00)
-    static let danger = Color(red: 0.96, green: 0.14, blue: 0.35)
-    static let textPrimary = Color.white
-    static let textSecondary = Color.white.opacity(0.86)
-    static let textMuted = Color.white.opacity(0.70)
-    static let textDisabled = Color.white.opacity(0.50)
-    static let separator = Color.white.opacity(0.16)
-    static let graphite = Color(red: 0.25, green: 0.25, blue: 0.25)
-
-    // Backward-compatible aliases used by existing screens.
+    private static func adaptive(light: UIColor, dark: UIColor) -> Color {
+        Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+    }
+    static let backgroundDeep = adaptive(light: UIColor(red: 0.95, green: 0.97, blue: 0.99, alpha: 1), dark: UIColor(red: 0.025, green: 0.045, blue: 0.08, alpha: 1))
+    static let backgroundNavy = adaptive(light: .secondarySystemBackground, dark: UIColor(red: 0.04, green: 0.08, blue: 0.15, alpha: 1))
+    static let backgroundElevated = adaptive(light: .systemBackground, dark: UIColor(red: 0.055, green: 0.085, blue: 0.13, alpha: 1))
+    static let cardGlass = backgroundElevated
+    static let cardBorder = Color(uiColor: .separator).opacity(0.45)
+    static let primaryMint = adaptive(light: UIColor(red: 0.02, green: 0.42, blue: 0.34, alpha: 1), dark: UIColor(red: 0.35, green: 0.85, blue: 0.69, alpha: 1))
+    static let primaryTeal = primaryMint
+    static let accentCyan = adaptive(light: .systemBlue, dark: .systemCyan)
+    static let accentMagenta = Color(uiColor: .systemPink)
+    static let success = adaptive(light: UIColor(red: 0.07, green: 0.42, blue: 0.20, alpha: 1), dark: .systemGreen)
+    static let warning = adaptive(light: UIColor(red: 0.62, green: 0.32, blue: 0.02, alpha: 1), dark: .systemYellow)
+    static let danger = Color(uiColor: .systemRed)
+    static let textPrimary = Color(uiColor: .label)
+    static let textSecondary = Color(uiColor: .secondaryLabel)
+    static let textMuted = Color(uiColor: .secondaryLabel)
+    static let textDisabled = Color(uiColor: .tertiaryLabel)
+    static let separator = Color(uiColor: .separator)
+    static let graphite = Color(uiColor: .systemGray)
     static let background = backgroundDeep
-    static let surface = Color(red: 0.04, green: 0.08, blue: 0.15)
+    static let surface = backgroundElevated
     static let card = backgroundElevated
-    static let elevated = Color(red: 0.09, green: 0.15, blue: 0.25)
+    static let elevated = backgroundNavy
     static let accent = primaryTeal
-    static let neutral = Color.gray
+    static let neutral = Color(uiColor: .secondaryLabel)
 
 }
 
@@ -108,8 +108,8 @@ enum BotaplataTheme {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
         appearance.backgroundColor = UIColor(BotaplataColors.backgroundDeep.opacity(0.92))
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+        appearance.titleTextAttributes = [.foregroundColor: UIColor(BotaplataColors.textPrimary)]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(BotaplataColors.textPrimary)]
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
@@ -122,8 +122,8 @@ enum BotaplataTheme {
         appearance.backgroundColor = UIColor(BotaplataColors.backgroundElevated.opacity(0.92))
         appearance.stackedLayoutAppearance.selected.iconColor = UIColor(BotaplataColors.primaryTeal)
         appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor(BotaplataColors.primaryTeal)]
-        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.white.withAlphaComponent(0.72)
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.white.withAlphaComponent(0.72)]
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor(BotaplataColors.textSecondary)
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor(BotaplataColors.textSecondary)]
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }

@@ -6,19 +6,14 @@ struct DashboardView: View {
     var openAlerts: () -> Void = {}
     var openSession: (String) -> Void = { _ in }
     var refresh: (() async -> Void)? = nil
-    @Environment(RealStrategyExplanationStore.self) private var strategyExplanationStore
+    @Environment(RealStrategyExplanationStore.self) private var strategyStore
 
     init(content: LoadedContent<RealActiveSnapshot>, unreadCount: Int = 0, openAlerts: @escaping () -> Void = {}, openSession: @escaping (String) -> Void = { _ in }, refresh: (() async -> Void)? = nil) {
-        self.content = content
-        self.unreadCount = unreadCount
-        self.openAlerts = openAlerts
-        self.openSession = openSession
-        self.refresh = refresh
+        self.content = content; self.unreadCount = unreadCount; self.openAlerts = openAlerts; self.openSession = openSession; self.refresh = refresh
     }
 
     init(summary: DashboardSummary) {
-        self.content = .loaded(RealActiveSnapshot(generatedAt: nil, activeSessionCount: summary.activeSession == nil ? 0 : 1, activeSession: summary.activeSession, warnings: summary.warnings, requestID: nil, serverTime: nil))
-        self.refresh = nil
+        content = .loaded(RealActiveSnapshot(generatedAt: nil, activeSessionCount: summary.activeSession == nil ? 0 : 1, activeSession: summary.activeSession, warnings: summary.warnings, requestID: nil, serverTime: nil))
     }
 
     var body: some View {
@@ -30,6 +25,7 @@ struct DashboardView: View {
                     bodyContent
                 }
                 .padding(BotaplataSpacing.md)
+                .safeAreaPadding(.bottom, BotaplataSpacing.md)
             }
             .refreshable { await refresh?() }
         }
@@ -38,169 +34,129 @@ struct DashboardView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center) {
-            Text("Dashboard")
-                .font(BotaplataTypography.largeTitle)
-                .foregroundStyle(BotaplataColors.textPrimary)
-                .accessibilityAddTraits(.isHeader)
+        HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Botaplata").font(.title.bold()).accessibilityAddTraits(.isHeader)
+                Text("Supervision · lecture seule").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+            }
             Spacer()
             Button(action: openAlerts) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: BotaplataSymbol.alerts)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(BotaplataColors.textPrimary)
-                        .frame(width: BotaplataTouch.minimum, height: BotaplataTouch.minimum)
-                        .background(BotaplataColors.cardGlass, in: Circle())
-                        .overlay(Circle().stroke(BotaplataColors.cardBorder, lineWidth: 1))
-                    if unreadCount > 0 {
-                        Text("\(min(unreadCount, 99))")
-                            .font(.caption2.bold().monospacedDigit())
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(BotaplataColors.danger, in: Capsule())
-                            .offset(x: 6, y: -4)
-                    }
-                }
+                Image(systemName: unreadCount > 0 ? "bell.badge" : "bell")
+                    .font(.title3).frame(width: 44, height: 44)
             }
-            .accessibilityLabel(unreadCount > 0 ? "Alertes, \(unreadCount) non lues" : "Alertes, aucune non lue")
+            .accessibilityLabel(unreadCount > 0 ? "Alertes, \(unreadCount) non lues" : "Alertes")
         }
+        .foregroundStyle(BotaplataColors.textPrimary)
     }
 
     @ViewBuilder private var bodyContent: some View {
         switch content {
         case .idle, .loading:
-            DashboardLoadingView()
+            PremiumSkeletonCard(); PremiumSkeletonCard(); PremiumSkeletonCard()
         case .error(let message):
-            PremiumErrorState(title: "Impossible de charger le Dashboard", message: message)
-            PremiumSecondaryButton(title: "Réessayer") { Task { await refresh?() } }
-        case .loaded(let snapshot):
+            PremiumErrorState(title: "Dashboard indisponible", message: message)
+            retry
+        case .loaded(let snapshot), .partial(let snapshot):
             snapshotView(snapshot, cached: false, offline: false)
-        case .loadedFromCache(let snapshot):
+        case .loadedFromCache(let snapshot), .stale(let snapshot):
             snapshotView(snapshot, cached: true, offline: false)
         case .refreshing(let snapshot?):
             snapshotView(snapshot, cached: false, offline: false)
-        case .partial(let snapshot):
-            snapshotView(snapshot, cached: false, offline: false)
-        case .stale(let snapshot):
-            snapshotView(snapshot, cached: true, offline: false)
         case .offline(let snapshot?):
             snapshotView(snapshot, cached: true, offline: true)
-        case .refreshing(nil), .offline(nil):
-            PremiumOfflineBanner()
-            PremiumErrorState(title: "Impossible de charger le Dashboard", message: "Vérifiez la connexion au serveur Botaplata.")
-            PremiumSecondaryButton(title: "Réessayer") { Task { await refresh?() } }
+        case .refreshing(nil):
+            PremiumSkeletonCard()
+        case .offline(nil):
+            PremiumEmptyState(title: "Hors ligne", message: "Aucun état en cache n’est disponible. Actualisez lorsque la connexion revient.", systemImage: "wifi.slash")
+            retry
         }
     }
 
-    private func snapshotView(_ snapshot: RealActiveSnapshot, cached: Bool, offline: Bool) -> some View {
-        LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
+    private var retry: some View { PremiumSecondaryButton(title: "Réessayer") { Task { await refresh?() } } }
+
+    @ViewBuilder private func snapshotView(_ snapshot: RealActiveSnapshot, cached: Bool, offline: Bool) -> some View {
+        if let session = snapshot.activeSession {
+            SupervisionStrip(session: session, cached: cached, offline: offline)
+            PremiumMarketSection(session: session)
+            decision(session: session, cached: cached)
+            PremiumSessionPerformanceCard(session: session)
+            Button { openSession(session.id) } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Session suivie · \(session.pair)").font(.headline)
+                        Text([session.provider.displayName, session.strategyName].compactMap { $0 }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                }.padding(.vertical, 8).frame(minHeight: 44)
+            }.buttonStyle(.plain)
+            if let count = snapshot.activeSessionCount, count > 1 {
+                Text("\(count) sessions actives : le backend sélectionne la session suivie.").font(.caption).foregroundStyle(BotaplataColors.warning)
+            }
+            if session.reconciliation != nil { ReconciliationCard(session: session) }
+            if let order = session.activeOrder { ActiveOrderCard(order: order) }
+            ForEach(snapshot.warnings + session.warnings) { WarningBanner(warning: $0) }
+            Text("Snapshot généré : \(snapshot.generatedAt.map(HistoryPresentation.fullDate) ?? "date inconnue")")
+                .font(.caption2).foregroundStyle(BotaplataColors.textMuted)
+        } else {
             if offline { PremiumOfflineBanner() }
-            if cached && !offline { WarningBanner(warning: Warning(id: "cache", severity: .information, title: "Dernier état connu affiché", message: "Les données proviennent du cache local pendant l'actualisation.")) }
+            PremiumEmptyState(title: "Aucune session active", message: "Le backend ne signale aucune session Kraken réelle à suivre. Le graphique apparaît lorsqu’une session fournit ses bougies persistées.", systemImage: "chart.xyaxis.line")
+            Text(cached ? "État en cache · santé actuelle inconnue" : "Réponse reçue · santé du bot inconnue")
+                .font(.caption).foregroundStyle(BotaplataColors.textMuted)
             ForEach(snapshot.warnings) { WarningBanner(warning: $0) }
-            DashboardHeroCard(snapshot: snapshot, cached: cached || offline)
-            if unreadCount > 0 { DashboardAlertCard(unreadCount: unreadCount, openAlerts: openAlerts) }
-            if let session = snapshot.activeSession {
-                DashboardSessionCard(session: session, activeSessionCount: snapshot.activeSessionCount, openSession: openSession)
-                DecisionSummaryCard(session: session)
-                DashboardStrategyExplanationCard(session: session, store: strategyExplanationStore, openSession: openSession)
-                StrategyConditionsCard(decision: session.decision)
-                PositionCard(session: session)
-                ReconciliationCard(session: session)
-                if let order = session.activeOrder { ActiveOrderCard(order: order) }
-                SessionFinancialSummaryCard(session: session)
-                FeeAwareCard(fee: session.feeAware, compact: true)
-                HealthFreshnessCard(session: session, cached: cached || offline)
-                DashboardRefreshFooter(snapshot: snapshot, session: session, cached: cached || offline)
-            } else {
-                PremiumEmptyState(title: "Aucune session active", message: "Les sessions Kraken disponibles apparaîtront ici.", systemImage: "tray")
-                DashboardHealthEmptyCard(snapshot: snapshot, cached: cached || offline)
+        }
+    }
+
+    private func decision(session: SessionDetail, cached: Bool) -> some View {
+        PremiumCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Dernière décision").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                    Spacer()
+                    Button("Analyse") { openSession(session.id) }.font(.subheadline.bold()).frame(minHeight: 44)
+                }
+                if let explanation = strategyStore.explanation, explanation.sessionID == session.id {
+                    Text(explanation.decision.label).font(.title3.bold())
+                    Text(explanation.decision.summary).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary)
+                    if cached || strategyStore.isOffline { Text("Dernière analyse connue").font(.caption).foregroundStyle(BotaplataColors.warning) }
+                    if let close = explanation.analysis.candleCloseTime {
+                        Text("Bougie clôturée · \(HistoryPresentation.fullDate(close))").font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                    }
+                } else {
+                    Text(session.decision.title).font(.title3.bold())
+                    Text(session.decision.detail).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary)
+                    Text("Explication détaillée en attente du backend").font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                }
             }
         }
     }
 }
 
-private struct DashboardHeroCard: View {
-    let snapshot: RealActiveSnapshot
+struct SupervisionStrip: View {
+    let session: SessionDetail
     let cached: Bool
-    var session: SessionDetail? { snapshot.activeSession }
+    let offline: Bool
+    private var health: SupervisionState { PremiumSupervisionPresentation.state(session: session, cached: cached) }
+    private var status: BadgeStatus {
+        switch health { case .healthy: .success; case .degraded: .warning; case .blocked: .danger; case .unknown: .neutral }
+    }
     var body: some View {
-        PremiumCard(variant: .hero) {
-            VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
-                HStack(alignment: .top) {
-                    IconBadge(symbol: "shield.lefthalf.filled", label: "Botaplata", color: BotaplataColors.primaryMint)
-                    Spacer()
-                    if cached { StatusPill(status: .neutral, text: "Dernier état connu") }
-                    else if let session, session.runtimeHealth == .healthy, session.freshness.status == .fresh { LiveBadge() }
-                    else if let session { StatusPill(status: DashboardPresentation.primaryBadgeStatus(session), text: DashboardPresentation.primaryBadgeText(session)) }
-                }
-                Text(DashboardPresentation.heroTitle(session))
-                    .font(.title.weight(.bold))
-                    .foregroundStyle(BotaplataColors.textPrimary)
-                Text(DashboardPresentation.heroSubtitle(session))
-                    .font(BotaplataTypography.body)
-                    .foregroundStyle(BotaplataColors.textSecondary)
-                HStack { if let session { ProviderBadge(provider: session.provider); FreshnessBadge(freshness: cached ? DataFreshness(status: .cached, updatedAt: session.freshness.updatedAt, source: .localCache) : session.freshness) } }
+        VStack(alignment: .leading, spacing: 6) {
+            ViewThatFits(in: .horizontal) {
+                HStack { StatusPill(status: status, text: health.title + (cached && health == .blocked ? " · dernier état" : "")); Spacer(); connection }
+                VStack(alignment: .leading) { StatusPill(status: status, text: health.title + (cached && health == .blocked ? " · dernier état" : "")); connection }
             }
+            Text("Données : \(cached ? "dernier état connu" : SessionFreshnessPresentation.text(for: session.freshness))")
+                .font(.caption).foregroundStyle(BotaplataColors.textSecondary)
         }
         .accessibilityElement(children: .combine)
     }
-}
-
-private struct DashboardSessionCard: View {
-    let session: SessionDetail; let activeSessionCount: Int?; let openSession: (String) -> Void
-    var body: some View {
-        Button { openSession(session.id) } label: {
-            PremiumCard {
-                VStack(alignment: .leading, spacing: BotaplataSpacing.sm) {
-                    HStack { Text("Session suivie").font(BotaplataTypography.cardTitle); Spacer(); Image(systemName: "chevron.right").foregroundStyle(BotaplataColors.textMuted) }
-                    Text(session.pair).font(.title2.bold().monospacedDigit()).foregroundStyle(BotaplataColors.textPrimary)
-                    row("Plateforme", session.provider.displayName)
-                    row("Stratégie", session.strategyName ?? "Indisponible")
-                    row("Analyse", RealSessionUIPresentation.analysisText(session))
-                    row("Mode", RealSessionUIPresentation.executionModeText(session.executionMode))
-                    if let count = activeSessionCount, count > 1 { Text("Plusieurs sessions actives signalées par le backend.").font(.caption).foregroundStyle(BotaplataColors.warning) }
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Session suivie, \(session.pair.replacingOccurrences(of: "/", with: " ")), \(session.provider.displayName), \(DashboardPresentation.wording(for: session.lifecycle).title).")
-        .accessibilityHint("Ouvre le détail réel de la session")
+    private var connection: some View {
+        Label(offline ? "Hors ligne" : cached ? "État en cache" : "Réponse reçue", systemImage: offline ? "wifi.slash" : "network")
+            .font(.caption).foregroundStyle(BotaplataColors.textSecondary)
     }
 }
-
-private struct DashboardDecisionCard: View { let session: SessionDetail
-    var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Décision actuelle").font(BotaplataTypography.cardTitle); HStack { StatusPill(status: DashboardPresentation.decisionBadgeStatus(session.lifecycle), text: DashboardPresentation.decisionBadgeText(session.lifecycle)); Spacer() }; if let favorable = session.decision.favorableConditions, let required = session.decision.requiredConditions { Text("\(favorable) / \(required) conditions favorables").font(BotaplataTypography.metricValue).monospacedDigit() }; Text(session.decision.detail).foregroundStyle(BotaplataColors.textSecondary); if session.decision.favorableConditions == nil { Text("Le détail des conditions sera affiché lorsque le backend le fournit.").font(.caption).foregroundStyle(BotaplataColors.textMuted) } } }.accessibilityElement(children: .combine) }
-}
-
-private struct DashboardPositionCard: View { let session: SessionDetail
-    var body: some View { PremiumCard(variant: DashboardPresentation.pnlVariant(session.pnl?.netEstimated)) { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Position ouverte").font(BotaplataTypography.cardTitle); row("Quantité", session.position?.quantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Prix moyen exécuté", display(session.position?.averageExecutionPrice)); row("Prix de revient frais inclus", display(session.position?.costBasisPrice ?? session.feeAware.costBasisPrice)); row("Prix actuel", display(session.currentPrice)); row("Résultat net estimé", display(session.pnl?.netEstimated ?? session.feeAware.unrealizedPnLNetEstimatedQuote)); Text("Cette estimation tient compte des frais d'achat réels, des frais de vente estimés et du slippage estimé.").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } }.accessibilityElement(children: .combine) }
-}
-
-private struct DashboardOrderCard: View { let order: TradingOrderSummary
-    var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Ordre actif").font(BotaplataTypography.cardTitle); StatusPill(status: order.status == .rejected ? .danger : order.status == .filled ? .success : .waiting, text: DashboardPresentation.orderStatusText(order.status)); row("Sens", DashboardPresentation.orderSideText(order.side)); row("Quantité demandée", order.requestedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Quantité exécutée", order.executedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible"); row("Prix limite ou moyen", display(order.limitPrice ?? order.averageExecutionPrice)); if let updated = order.updatedAt ?? order.createdAt { row("Dernière mise à jour", DashboardPresentation.time(updated)) }; Text(order.message).font(.caption).foregroundStyle(BotaplataColors.textSecondary) } }.accessibilityElement(children: .combine) }
-}
-
-private struct DashboardMarketAnalysisCard: View { let session: SessionDetail; let openSession: (String) -> Void
-    var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Analyse du marché").font(BotaplataTypography.cardTitle); Text("Le graphique détaillé est disponible dans la session.").foregroundStyle(BotaplataColors.textSecondary); Text("L’historique de prix sera affiché lorsqu’il sera disponible.").font(.caption).foregroundStyle(BotaplataColors.textMuted); PremiumSecondaryButton(title: "Voir la session") { openSession(session.id) } } } }
-}
-
-private struct DashboardHealthCard: View { let session: SessionDetail; let cached: Bool
-    var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("État de Botaplata").font(BotaplataTypography.cardTitle); row("Surveillance", DashboardPresentation.monitoringText(session.runtimeHealth)); row("Données", cached ? "Dernier état connu" : DashboardPresentation.freshnessText(session.freshness)); if let errors = session.monitoringConsecutiveErrors, errors > 0 { row("Erreurs", "\(errors) consécutives") } } }.accessibilityElement(children: .combine) }
-}
-private struct DashboardHealthEmptyCard: View { let snapshot: RealActiveSnapshot; let cached: Bool
-    var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("État de Botaplata").font(BotaplataTypography.cardTitle); row("Serveur Botaplata", "Disponible"); row("Données", cached ? "Dernier état connu" : snapshot.generatedAt.map { "Actualisées à \(DashboardPresentation.time($0))" } ?? "Actualisation inconnue") } } }
-}
-private struct DashboardAlertCard: View { let unreadCount: Int; let openAlerts: () -> Void
-    var body: some View { Button(action: openAlerts) { PremiumCard(variant: .warning) { HStack { VStack(alignment: .leading, spacing: 4) { Text("\(unreadCount) alertes non lues").font(BotaplataTypography.cardTitle).monospacedDigit(); Text("Voir les alertes").foregroundStyle(BotaplataColors.textSecondary) }; Spacer(); Image(systemName: "chevron.right") } } }.buttonStyle(.plain).accessibilityLabel("Alertes, \(unreadCount) non lues") }
-}
-private struct DashboardRefreshFooter: View { let snapshot: RealActiveSnapshot; let session: SessionDetail; let cached: Bool
-    var body: some View { Text(cached ? "Dernier état connu affiché." : "Dernière actualisation : \(DashboardPresentation.lastRefresh(snapshot: snapshot, session: session))").font(.caption).foregroundStyle(BotaplataColors.textMuted).frame(maxWidth: .infinity, alignment: .center) }
-}
-private struct DashboardLoadingView: View { var body: some View { VStack(spacing: BotaplataSpacing.md) { PremiumSkeletonCard(); PremiumSkeletonCard(); PremiumSkeletonCard() } } }
-
-private func row(_ key: String, _ value: String) -> some View { HStack(alignment: .firstTextBaseline) { Text(key).foregroundStyle(BotaplataColors.textSecondary); Spacer(minLength: BotaplataSpacing.sm); Text(value).foregroundStyle(BotaplataColors.textPrimary).multilineTextAlignment(.trailing).monospacedDigit() }.font(BotaplataTypography.body) }
-private func display(_ amount: MoneyAmount?) -> String { let value = FinancialFormatters.money(amount); return value == "—" ? "Indisponible" : value }
 
 extension DashboardPresentation {
     static func shouldShowPosition(_ position: OpenPosition?) -> Bool { guard let quantity = position?.quantity else { return false }; return quantity > 0 }
@@ -217,32 +173,4 @@ extension DashboardPresentation {
     static func pnlVariant(_ amount: MoneyAmount?) -> PremiumCardVariant { guard let value = amount?.value else { return .normal }; return value >= 0 ? .success : .danger }
     static func time(_ date: Date) -> String { let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateStyle = .none; f.timeStyle = .short; return f.string(from: date) }
     static func lastRefresh(snapshot: RealActiveSnapshot, session: SessionDetail) -> String { if let date = session.freshness.updatedAt ?? snapshot.generatedAt { return time(date) }; return "inconnue" }
-}
-
-#Preview("Dashboard nominal waiting_buy") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuy, warnings: [], requestID: nil, serverTime: nil)), unreadCount: 0) } }
-#Preview("Dashboard 3 conditions sur 4") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuy, warnings: [], requestID: nil, serverTime: nil)), unreadCount: 2) } }
-#Preview("Dashboard position ouverte") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.krakenDetail, warnings: [], requestID: nil, serverTime: nil)), unreadCount: 1) } }
-#Preview("Dashboard BUY en attente") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuyFill, warnings: [], requestID: nil, serverTime: nil)), unreadCount: 0) } }
-#Preview("Dashboard offline avec cache") { NavigationStack { DashboardView(content: .offline(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.krakenDetail, warnings: [], requestID: nil, serverTime: nil)), unreadCount: 3) } }
-#Preview("Dashboard aucune session") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 0, activeSession: nil, warnings: [], requestID: nil, serverTime: nil)), unreadCount: 0) } }
-#Preview("Dashboard loading") { NavigationStack { DashboardView(content: .loading) } }
-#Preview("Dashboard waiting buy") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuy, warnings: [], requestID: nil, serverTime: nil))) } }
-#Preview("Dashboard décision 3 sur 4") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuyWithConditions, warnings: [], requestID: nil, serverTime: nil))) } }
-#Preview("Dashboard position ouverte") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.krakenDetail, warnings: [], requestID: nil, serverTime: nil))) } }
-#Preview("Dashboard ordre pending") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.waitingBuyFill, warnings: [], requestID: nil, serverTime: nil))) } }
-#Preview("Dashboard réconciliation") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.reconciliationDetail, warnings: [], requestID: nil, serverTime: nil))) } }
-#Preview("Dashboard données anciennes") { NavigationStack { DashboardView(content: .loaded(RealActiveSnapshot(generatedAt: PreviewFixtures.now, activeSessionCount: 1, activeSession: PreviewFixtures.staleDetail, warnings: PreviewFixtures.staleDetail.warnings, requestID: nil, serverTime: nil))) } }
-
-
-private struct DashboardStrategyExplanationCard: View {
-    let session: SessionDetail
-    @Bindable var store: RealStrategyExplanationStore
-    let openSession: (String) -> Void
-    var body: some View {
-        Group {
-            if let e = store.explanation, e.sessionID == session.id {
-                PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Décision actuelle").font(BotaplataTypography.cardTitle); Text(e.decision.label).font(.headline); Text(e.decision.summary).foregroundStyle(BotaplataColors.textSecondary); if let score = e.score { PremiumKeyValueRow(label: "Conditions", value: "\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—") conditions", monospaced: true) }; if let close = e.analysis.candleCloseTime { Text("Analyse basée sur la bougie clôturée à \(DashboardPresentation.time(close))").font(.caption).foregroundStyle(BotaplataColors.textMuted) }; if let next = e.analysis.nextRecalculationAt { Text("Prochaine actualisation : \(DashboardPresentation.time(next))").font(.caption).foregroundStyle(BotaplataColors.textMuted) }; if let blocker = e.blockers.first { Text(blocker.summary).font(.caption).foregroundStyle(BotaplataColors.warning) }; PremiumSecondaryButton(title: "Comprendre la décision") { openSession(session.id) } } }
-            } else if store.isLoading { PremiumSkeletonCard() }
-        }.task { await store.load(sessionID: session.id, reason: "dashboardActiveSession") }
-    }
 }

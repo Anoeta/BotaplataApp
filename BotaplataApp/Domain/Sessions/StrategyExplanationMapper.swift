@@ -1,6 +1,7 @@
 import Foundation
+#if canImport(OSLog)
 import OSLog
-import Observation
+#endif
 
 extension RealStrategyExplanationDTO {
   func mapped() -> StrategyExplanation { data.mapped(metaDTO: meta) }
@@ -36,12 +37,14 @@ extension RealStrategyExplanationDataDTO {
       meta: metaModel
     )
 
+    #if canImport(OSLog)
     BotaplataLog.strategyExplanation.info(
       "StrategyExplanationMapper decision=\(mapped.decision.rawValue, privacy: .public) score=\(mapped.score?.currentRaw ?? "nil", privacy: .public)/\(mapped.score?.requiredRaw ?? "nil", privacy: .public) conditions=\(mapped.conditions.count, privacy: .public) blockers=\(mapped.blockers.count, privacy: .public)"
     )
     BotaplataLog.strategyExplanation.debug(
       "StrategyExplanationMapper conditions=\(mapped.conditions.count, privacy: .public) conditionNullValues=\(conditionNullValues, privacy: .public)"
     )
+    #endif
     return mapped
   }
 
@@ -126,11 +129,13 @@ extension RealStrategyExplanationDataDTO {
     } else {
       rsiSource = "none"
     }
+    #if canImport(OSLog)
     BotaplataLog.strategyExplanation.debug(
       "StrategyExplanationMapper indicators rsiPresent=\(indicators.rsi?.value != nil, privacy: .public) adxPresent=\(indicators.adx?.value != nil, privacy: .public) atrPresent=\(indicators.atr?.value != nil, privacy: .public)"
     )
     BotaplataLog.strategyExplanation.debug("StrategyExplanationMapper rsiSource=\(rsiSource, privacy: .public)")
     BotaplataLog.strategyExplanation.debug("StrategyExplanationMapper rsiConditionValuePresent=\(rsiCondition?.value != nil, privacy: .public)")
+    #endif
     return indicators.mapped(rsiCondition: rsiCondition)
   }
 

@@ -1,0 +1,105 @@
+{
+  "data": {
+    "session_id": "1",
+    "strategy": {
+      "code": "star_v3",
+      "name": "Star Strategy V3"
+    },
+    "decision": {
+      "code": "wait",
+      "label": "Botaplata attend",
+      "summary": "3 conditions sont favorables sur les 4 nécessaires. Aucun achat n’est envoyé.",
+      "technical_reason": "entry_threshold_not_reached"
+    },
+    "score": {
+      "current": 3,
+      "required": 4,
+      "maximum": 4,
+      "favorable_conditions": 3,
+      "total_conditions": 4
+    },
+    "analysis": {
+      "decision_timeframe": "5m",
+      "candle_open_time": "2026-10-10T11:50:00Z",
+      "candle_close_time": "2026-10-10T11:55:00Z",
+      "calculated_at": "2026-10-10T12:00:00Z",
+      "next_recalculation_at": "2026-10-10T12:00:00Z",
+      "is_stale": false,
+      "freshness_seconds": 0,
+      "stale_threshold_seconds": 600
+    },
+    "market": {
+      "regime": {
+        "code": "range",
+        "label": "Marché en range"
+      },
+      "momentum": {
+        "code": "unavailable",
+        "label": "Momentum indisponible"
+      }
+    },
+    "conditions": [
+      {
+        "code": "rsi",
+        "label": "RSI",
+        "status": "unfavorable",
+        "value": "43",
+        "threshold": null,
+        "summary": "RSI disponible, défavorable à l’entrée",
+        "technical_detail": "RSI disponible, défavorable à l’entrée",
+        "importance": "required"
+      }
+    ],
+    "blockers": [
+      {
+        "code": "score_insuffisant",
+        "label": "Score insuffisant",
+        "severity": "warning",
+        "summary": "Botaplata attend avant d’agir.",
+        "technical_detail": "score insuffisant",
+        "is_recoverable": true
+      }
+    ],
+    "indicators": {
+      "rsi": {
+        "value": "43",
+        "period": 14,
+        "status": "neutral"
+      },
+      "adx": {
+        "value": "18.4",
+        "period": 14,
+        "status": "neutral"
+      },
+      "atr": {
+        "value": "1.26",
+        "period": 14,
+        "status": "neutral"
+      },
+      "vwap": {
+        "value": "162.40",
+        "price_relation": null,
+        "status": "neutral"
+      },
+      "ema200": {
+        "value": "164.80",
+        "slope": "-0.12",
+        "price_relation": null,
+        "status": "neutral"
+      },
+      "bollinger": {
+        "upper": "167.20",
+        "middle": "163.10",
+        "lower": "159.00",
+        "price_position": "near_lower",
+        "status": "neutral"
+      }
+    },
+    "position_protection": null,
+    "warnings": []
+  },
+  "meta": {
+    "generated_at": "2026-10-10T12:00:00Z",
+    "data_source": "persisted_strategy_decision"
+  }
+}

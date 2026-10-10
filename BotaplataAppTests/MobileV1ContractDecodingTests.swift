@@ -39,12 +39,12 @@ final class MobileV1ContractDecodingTests: XCTestCase {
         XCTAssertEqual(session.status, .open)
         XCTAssertNotEqual(session.status, .filled)
         XCTAssertEqual(session.averageExecutionPrice?.value, Decimal(string: "78.95"))
-        let detail = envelope("real_session_detail_order_pending", RealSessionDetailDTO.self).data!.mapped()
+        let detail = try envelope("real_session_detail_order_pending", RealSessionDetailDTO.self).data!.mapped()
         XCTAssertNil(detail.position)
     }
 
     func testReconciliationContract() throws {
-        let detail = envelope("real_session_detail_reconciliation", RealSessionDetailDTO.self).data!.mapped()
+        let detail = try envelope("real_session_detail_reconciliation", RealSessionDetailDTO.self).data!.mapped()
         XCTAssertEqual(detail.reconciliation?.title, "Vérification en cours")
         XCTAssertNotEqual(detail.activeOrder?.status, .rejected)
     }

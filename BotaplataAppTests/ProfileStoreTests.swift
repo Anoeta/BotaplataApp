@@ -23,14 +23,14 @@ final class ProfileStoreTests: XCTestCase {
         let (store, _, prefs) = makeStore(bio: ControlledBiometricAuthenticator(availabilityValue: .available, result: .succeeded))
         await store.setBiometricLockEnabled(true)
         XCTAssertTrue(store.biometricLockEnabled)
-        XCTAssertTrue(await prefs.biometricLockEnabled())
+        let awaitedValue32 = await prefs.biometricLockEnabled(); XCTAssertTrue(awaitedValue32)
     }
 
     func testBiometricCancelledLeavesPreferenceDisabled() async throws {
         let (store, _, prefs) = makeStore(bio: ControlledBiometricAuthenticator(availabilityValue: .available, result: .cancelled))
         await store.setBiometricLockEnabled(true)
         XCTAssertFalse(store.biometricLockEnabled)
-        XCTAssertFalse(await prefs.biometricLockEnabled())
+        let awaitedValue33 = await prefs.biometricLockEnabled(); XCTAssertFalse(awaitedValue33)
     }
 
     func testAutomaticLockCoordinatorLocksOnlyAfterBackgroundAuthenticatedAndEnabled() {

@@ -36,7 +36,7 @@ final class SessionsPresentationTests: XCTestCase {
 
     func testSubmittedOpenFilledAndReconciliationStayDistinct() {
         XCTAssertEqual(SessionsPresentation.activeOrderStatusText(.submitted), "Envoyé à Kraken")
-        XCTAssertEqual(SessionsPresentation.activeOrderStatusText(.open), "En attente sur Kraken")
+        XCTAssertEqual(SessionsPresentation.activeOrderStatusText(.open), "Ouvert · état local")
         XCTAssertEqual(SessionsPresentation.activeOrderStatusText(.filled), "Confirmé par Kraken")
         XCTAssertEqual(SessionsPresentation.activeOrderStatusText(.reconciliationRequired), "Vérification en cours")
         XCTAssertNotEqual(SessionsPresentation.activeOrderStatusText(.reconciliationRequired), SessionsPresentation.activeOrderStatusText(.rejected))

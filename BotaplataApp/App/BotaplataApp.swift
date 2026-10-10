@@ -5,6 +5,7 @@ import UIKit
 
 @main
 struct BotaplataApp: App {
+    @AppStorage("botaplata.appearance") private var appearance = "dark"
     @State private var appState: AppState
     @State private var router = AppRouter()
     @State private var authStore: AuthenticationStore
@@ -22,11 +23,12 @@ struct BotaplataApp: App {
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
-        let isUITesting = arguments.contains("--botaplata-ui-tests")
         #if DEBUG
+        let isUITesting = arguments.contains("--botaplata-ui-tests")
         let isExplicitDemo = arguments.contains("--botaplata-demo-authenticated") || ProcessInfo.processInfo.environment["BOTAPLATA_DEBUG_DEMO"] == "1"
         let environment: AppEnvironment = isUITesting ? .uiTesting : (isExplicitDemo ? .debugPreview : .configuredDevelopment)
         #else
+        let isUITesting = false
         let isExplicitDemo = false
         let environment: AppEnvironment = .production
         #endif
@@ -89,6 +91,6 @@ struct BotaplataApp: App {
     }
 
     var body: some Scene {
-        WindowGroup { RootView().preferredColorScheme(.dark).environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).environment(realSessionChartStore).environment(strategyExplanationStore).environment(profileStore).environment(pushStore).task { BotaplataAppDelegate.bridge = pushBridge; pushBridge.onDeviceToken = { token in Task { await pushStore.registerDeviceToken(token) } }; pushBridge.onForeground = { Task { await pushStore.refreshAll(force: true) } }; pushBridge.onNotificationTap = { target, id in Task { await pushStore.handleNotificationTap(target: target, notificationID: id, router: router) } }; if appState.sessionState == .unknown { await authStore.restore() } } }
+        WindowGroup { RootView().preferredColorScheme(appearance == "system" ? nil : appearance == "light" ? .light : .dark).environment(appState).environment(router).environment(authStore).environment(activeSessionStore).environment(realSessionsStore).environment(realSessionHistoryStore).environment(realSessionChartStore).environment(strategyExplanationStore).environment(profileStore).environment(pushStore).task { BotaplataAppDelegate.bridge = pushBridge; pushBridge.onDeviceToken = { token in Task { await pushStore.registerDeviceToken(token) } }; pushBridge.onForeground = { Task { await pushStore.refreshAll(force: true) } }; pushBridge.onNotificationTap = { target, id in Task { await pushStore.handleNotificationTap(target: target, notificationID: id, router: router) } }; if appState.sessionState == .unknown { await authStore.restore() } } }
     }
 }

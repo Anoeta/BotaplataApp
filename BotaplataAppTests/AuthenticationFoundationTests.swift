@@ -46,13 +46,13 @@ final class AuthenticationFoundationTests: XCTestCase {
         let store = InMemoryTokenStore()
         let session = AuthenticationSession(repository: repo, tokenStore: store)
         try await session.apply(AuthenticationFixtures.successfulSession)
-        XCTAssertEqual(await session.accessToken, "fixture-access-token-never-production")
+        let awaitedValue29 = await session.accessToken; XCTAssertEqual(awaitedValue29, "fixture-access-token-never-production")
         async let a = session.refresh()
         async let b = session.refresh()
         _ = try await [a, b]
-        XCTAssertEqual(await repo.refreshCallCount, 1)
+        let awaitedValue30 = await repo.refreshCallCount; XCTAssertEqual(awaitedValue30, 1)
         await session.logout()
-        XCTAssertNil(await session.accessToken)
+        let awaitedValue31 = await session.accessToken; XCTAssertNil(awaitedValue31)
         XCTAssertNil(try await store.readRefreshToken())
     }
 

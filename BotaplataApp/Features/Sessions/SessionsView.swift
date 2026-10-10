@@ -109,7 +109,7 @@ enum SessionsPresentation {
         switch status {
         case .submissionStarted: "Préparation de l’ordre"
         case .submitted: "Envoyé à Kraken"
-        case .open: "En attente sur Kraken"
+        case .open: "Ouvert · état local"
         case .partiallyFilled: "Partiellement exécuté"
         case .filled: "Confirmé par Kraken"
         case .reconciliationRequired: "Vérification en cours"
@@ -311,6 +311,14 @@ struct PremiumSessionCard: View {
                     Spacer()
                     FreshnessBadge(freshness: session.freshness)
                 }
+                if let started = session.startedAt {
+                    Text("Depuis \(HistoryPresentation.fullDate(started))").font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                }
+                if let price = session.currentPrice { PremiumKeyValueRow(label: "Cours observé", value: FinancialFormatters.money(price), monospaced: true) }
+                if let quantity = session.baseQuantity, quantity > 0 {
+                    Text("Position · \(FinancialFormatters.decimal(quantity, min: 2, max: 8)) unités").font(.caption)
+                }
+                Text("Capital : non fourni par l’API réelle").font(.caption).foregroundStyle(BotaplataColors.textMuted)
                 Text(freshnessText).font(.caption).foregroundStyle(BotaplataColors.textMuted)
             }
         }
@@ -405,38 +413,28 @@ struct SessionDetailContent: View {
     }
 
     private var detailHeader: some View {
-        PremiumCard(variant: .hero) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(session.pair).font(BotaplataTypography.largeTitle)
-                        Text(headerSubtitle).foregroundStyle(BotaplataColors.textSecondary)
-                    }
-                    Spacer()
-                    StatusPill(status: liveStatus, text: liveStatusText)
-                }
-                HStack {
-                    StatusPill(status: .waiting, text: SessionsPresentation.lifecycleTitle(session.lifecycle))
-                    FreshnessBadge(freshness: session.freshness)
-                }
-                Text(session.lifecycle.userMessage).foregroundStyle(BotaplataColors.textSecondary)
-                Text(freshnessText).font(.caption).foregroundStyle(BotaplataColors.textMuted)
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            Text(session.pair).font(.title.bold())
+            Text(headerSubtitle).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+            Text(SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.subheadline)
+            Text(freshnessText).font(.caption).foregroundStyle(BotaplataColors.textMuted)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var detailSections: [NotificationNavigationTarget.Section] { [.overview, .analysis, .chart, .orders, .journal, .decisions] }
+
     private var sectionSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack {
-                ForEach(NotificationNavigationTarget.Section.allCases, id: \.self) { section in
-                    Button { selectedSection = section } label: {
-                        FilterPill(title: section.title, isSelected: selectedSection == section)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Section \(section.title)" + (selectedSection == section ? ", sélectionnée" : ""))
-                }
+        Picker("Section de la session", selection: $selectedSection) {
+            ForEach(detailSections, id: \.self) { section in
+                Label(section.title, systemImage: section.symbol).tag(section)
             }
         }
+        .pickerStyle(.menu)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .accessibilityLabel("Section : \(selectedSection.title)")
+        .padding(.horizontal, 8)
+        .background(BotaplataColors.cardGlass, in: RoundedRectangle(cornerRadius: 12))
     }
 
     @ViewBuilder private var sectionContent: some View {
@@ -462,13 +460,13 @@ struct SessionDetailContent: View {
                 if isOffline { PremiumOfflineBanner() }
                 ForEach(session.warnings) { WarningBanner(warning: $0) }
                 ReconciliationCard(session: session)
-                stateCard
-                marketCard
+                SupervisionStrip(session: session, cached: isOffline, offline: isOffline)
+                PremiumMarketSection(session: session)
                 DecisionSummaryCard(session: session, detailed: true)
                 StrategyConditionsCard(decision: session.decision)
                 PositionCard(session: session)
                 if let order = session.activeOrder { ActiveOrderCard(order: order) }
-                SessionFinancialSummaryCard(session: session)
+                PremiumSessionPerformanceCard(session: session)
                 FeeAwareCard(fee: session.feeAware)
                 HealthFreshnessCard(session: session, cached: isOffline)
             }
@@ -562,6 +560,7 @@ extension NotificationNavigationTarget.Section {
 struct StrategyExplanationSectionView: View {
     let session: SessionDetail
     @Bindable var store: RealStrategyExplanationStore
+    @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
@@ -569,7 +568,7 @@ struct StrategyExplanationSectionView: View {
             }
             .padding()
         }
-        .task { await store.load(sessionID: session.id, reason: "sectionOpened") }
+        .task(id: scenePhase) { if scenePhase == .active { await store.load(sessionID: session.id, reason: "sectionOpened") } else { store.cancel(sessionID: session.id) } }
         .refreshable { await store.refresh(sessionID: session.id) }
         .onDisappear { store.cancel(sessionID: session.id) }
     }
@@ -584,7 +583,7 @@ struct StrategyExplanationSectionView: View {
                 Task { await store.refresh(sessionID: session.id) }
             }
         case .offlineCached:
-            if let e = store.explanation {
+            if let e = store.explanation, e.sessionID == session.id {
                 PremiumCard(variant: .warning) {
                     Text("Dernière analyse connue").font(BotaplataTypography.cardTitle)
                     Text(store.lastUpdatedAt.map(HistoryPresentation.fullDate) ?? "Date inconnue").foregroundStyle(BotaplataColors.textSecondary)
@@ -595,7 +594,7 @@ struct StrategyExplanationSectionView: View {
             if store.isRefreshing {
                 PremiumLoadingState(title: "Actualisation", message: "Botaplata récupère la dernière décision.")
             }
-            if let e = store.explanation {
+            if let e = store.explanation, e.sessionID == session.id {
                 StrategyExplanationContent(explanation: e)
             } else {
                 PremiumEmptyState(title: "Analyse indisponible", message: "Les indicateurs ne sont pas encore disponibles.")
@@ -610,6 +609,7 @@ struct StrategyExplanationContent: View {
         VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
             StrategyDecisionHeroCard(explanation: explanation)
             StrategyScoreCard(score: explanation.score)
+            PremiumReboundCard(conditions: explanation.conditions)
             StrategyConditionsExplanationCard(conditions: explanation.conditions)
             if !explanation.blockers.isEmpty { StrategyBlockersCard(blockers: explanation.blockers) }
             StrategyMarketCard(market: explanation.market)
@@ -617,6 +617,9 @@ struct StrategyExplanationContent: View {
             StrategyAnalysisBaseCard(analysis: explanation.analysis)
             if let p = explanation.positionProtection {
                 StrategyPositionProtectionCard(protection: p)
+            }
+            ForEach(explanation.warnings) { warning in
+                WarningBanner(warning: Warning(id: warning.id, severity: warning.severity == .critical ? .critical : .warning, title: warning.title, message: warning.message))
             }
             StrategyTechnicalDetailsCard(explanation: explanation)
         }
@@ -630,9 +633,6 @@ struct StrategyDecisionHeroCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 Label(explanation.decision.label, systemImage: icon).font(BotaplataTypography.cardTitle)
                 Text(explanation.decision.summary).foregroundStyle(BotaplataColors.textSecondary)
-                if let score = explanation.score {
-                    Text("\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—")").font(.title2.bold()).monospacedDigit()
-                }
                 if let close = explanation.analysis.candleCloseTime {
                     Text("Dernière analyse : bougie clôturée à \(HistoryPresentation.time(close))").font(.caption).foregroundStyle(BotaplataColors.textMuted)
                 }
@@ -655,20 +655,23 @@ struct StrategyScoreCard: View {
     let score: StrategyScore?
     var body: some View {
         PremiumCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Score et seuil").font(BotaplataTypography.cardTitle)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Score d’entrée").font(.headline)
                 if let score {
-                    Text(score.summary ?? "\(score.favorableConditions ?? 0) conditions sur \(score.totalConditions ?? 0) sont favorables").foregroundStyle(BotaplataColors.textSecondary)
-                    HStack {
-                        ForEach(0..<(score.totalConditions ?? 4), id: \.self) { i in
-                            Capsule().fill(i < (score.favorableConditions ?? 0) ? BotaplataColors.success : BotaplataColors.cardBorder).frame(height: 8)
+                    Text("\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—") requis").font(.title.bold().monospacedDigit())
+                    if let maximum = score.maximum, maximum > 0, maximum <= 20, let current = score.current {
+                        HStack(spacing: 5) {
+                            ForEach(0..<maximum, id: \.self) { i in
+                                Capsule().fill(i < current ? BotaplataColors.primaryTeal : BotaplataColors.cardBorder).frame(height: 8)
+                            }
                         }
+                        .accessibilityLabel("Score d’entrée \(current), seuil \(score.requiredRaw ?? "inconnu"), maximum \(maximum)")
                     }
-                    PremiumKeyValueRow(label: "Score", value: "\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—")", monospaced: true)
-                    PremiumKeyValueRow(label: "Maximum", value: score.maximumRaw ?? "—", monospaced: true)
+                    if let summary = score.summary { Text(summary).font(.caption).foregroundStyle(BotaplataColors.textSecondary) }
                 } else {
-                    Text("Score en préparation").foregroundStyle(BotaplataColors.textSecondary)
+                    Text("Score non fourni").foregroundStyle(BotaplataColors.textSecondary)
                 }
+                Text("Le score d’entrée ne contient pas de points ajoutés pour le rebond.").font(.caption).foregroundStyle(BotaplataColors.textMuted)
             }
         }
     }
@@ -685,7 +688,7 @@ struct StrategyConditionsExplanationCard: View {
                         HStack {
                             Text(c.label).font(.headline)
                             Spacer()
-                            StatusPill(status: c.status == .favorable ? .success : c.status == .blocked ? .danger : .waiting, text: statusText(c.status))
+                            StatusPill(status: c.status == .favorable ? .success : c.status == .blocked ? .danger : .waiting, text: c.status == .unavailable && c.valueRaw != nil ? "Condition non validée" : statusText(c.status))
                         }
                         Text(c.summary).foregroundStyle(BotaplataColors.textSecondary)
                         if let v = c.valueRaw {
@@ -764,22 +767,34 @@ struct StrategyMarketCard: View {
 
 struct StrategyIndicatorsCard: View {
     let indicators: [StrategyIndicator]
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var displayed: [StrategyIndicator] {
+        ["rsi", "adx", "vwap", "bollinger", "ema200", "atr"].map { id in
+            indicators.first { $0.id == id } ?? StrategyIndicator(id: id, name: id.uppercased(), valueRaw: nil, status: nil, help: "Non fourni pour cette analyse.", technicalDetail: nil)
+        }
+    }
     var body: some View {
-        if !indicators.isEmpty {
-            PremiumCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Indicateurs utilisés").font(BotaplataTypography.cardTitle)
-                    ForEach(indicators) { i in
-                        VStack(alignment: .leading, spacing: 4) {
-                            PremiumKeyValueRow(label: i.name, value: i.displayValue, monospaced: true)
-                            if let statusText = i.displayStatusText { Text(statusText).font(.caption).foregroundStyle(BotaplataColors.textSecondary) }
-                            Text(i.help).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
-                            if let d = i.technicalDetail {
-                                DisclosureGroup("Détail technique") {
-                                    Text(d).font(.caption)
-                                }
+        PremiumCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Indicateurs · disponibilité").font(.headline)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2), alignment: .leading, spacing: 16) {
+                    ForEach(displayed) { indicator in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(indicator.name).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                            Text(indicator.valueRaw ?? "Indisponible").font(.headline.monospacedDigit()).fixedSize(horizontal: false, vertical: true)
+                            Text(PremiumIndicatorPresentation.status(indicator)).font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                            if indicator.id == "rsi", let raw = indicator.valueRaw,
+                               let value = Double(raw.replacingOccurrences(of: ",", with: ".")), (0...100).contains(value) {
+                                ProgressView(value: value, total: 100).tint(BotaplataColors.primaryTeal)
+                                    .accessibilityLabel("RSI \(raw), sur une échelle de 0 à 100. Les conditions d’entrée sont évaluées séparément par le backend.")
                             }
-                        }
+                        }.accessibilityElement(children: .combine)
+                    }
+                }
+                Text("Une valeur disponible peut être défavorable à la stratégie. Les conditions ci-dessus restent la référence.").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                DisclosureGroup("Comprendre les indicateurs") {
+                    ForEach(indicators) { indicator in
+                        Text("\(indicator.name) : \(indicator.help)").font(.caption).padding(.vertical, 3)
                     }
                 }
             }
@@ -868,13 +883,26 @@ struct StrategyTechnicalDetailsCard: View {
 }
 
 
-extension StrategyIndicator {
-    fileprivate var displayValue: String {
-        if id == "rsi", let raw = valueRaw?.replacingOccurrences(of: ",", with: "."), let decimal = Decimal(string: raw, locale: Locale(identifier: "en_US_POSIX")) {
-            let formatter = NumberFormatter(); formatter.locale = Locale(identifier: "fr_FR"); formatter.minimumFractionDigits = 1; formatter.maximumFractionDigits = 1
-            return formatter.string(from: decimal as NSDecimalNumber) ?? valueRaw ?? "Indisponible"
+struct PremiumReboundCard: View {
+    let conditions: [StrategyCondition]
+    private var rebound: [StrategyCondition] { conditions.filter { ["rebound", "bounce", "rebond"].contains($0.code.lowercased()) } }
+    var body: some View {
+        PremiumCard {
+            Text("Confirmation du rebond").font(.headline)
+            if rebound.isEmpty {
+                Text("Confirmation et score de rebond non exposés par ce contrat. Aucun point supplémentaire n’est calculé sur l’iPhone.").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+            } else {
+                ForEach(rebound) { condition in
+                    Text(condition.label).font(.subheadline.bold())
+                    Text(condition.summary).font(.caption)
+                }
+            }
         }
-        return valueRaw ?? "Indisponible"
     }
-    fileprivate var displayStatusText: String? { id == "rsi" && status != "favorable" ? "À confirmer" : nil }
+}
+
+extension NotificationNavigationTarget.Section {
+    var symbol: String {
+        switch self { case .overview: "square.grid.2x2"; case .analysis: "waveform.path.ecg"; case .chart: "chart.xyaxis.line"; case .orders: "arrow.left.arrow.right"; case .journal: "clock"; case .decisions: "checklist" }
+    }
 }
