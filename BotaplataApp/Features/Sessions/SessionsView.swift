@@ -10,7 +10,8 @@ struct SessionsContainerView: View {
             warnings: store.warnings,
             loadNext: { id in await store.loadNextPageIfNeeded(currentItemID: id) },
             refresh: { await store.refresh() },
-            historyStore: historyStore
+            historyStore: historyStore,
+            hasMore: store.pagination?.hasMore ?? false
         )
         .task { store.start() }
         .navigationDestination(for: SessionRoute.self) { route in
@@ -37,7 +38,7 @@ enum SessionListFilter: String, CaseIterable, Identifiable {
         switch self {
         case .all: "Toutes"
         case .active: "En cours"
-        case .history: "Historique"
+        case .history: "Terminées"
         case .watch: "À surveiller"
         }
     }
@@ -81,16 +82,19 @@ enum SessionsPresentation {
     }
 
     static func statusText(_ session: SessionSummary) -> String {
+        if session.isHistorical { return "Terminée" }
         if shouldWatch(session) { return "À surveiller" }
-        return session.isHistorical ? "Terminée" : "LIVE"
+        return session.backendStatus == "running" ? "En cours" : "État à confirmer"
     }
 
     static func status(_ session: SessionSummary) -> BadgeStatus {
+        if session.isHistorical { return .neutral }
         if shouldWatch(session) { return .warning }
-        return session.isHistorical ? .neutral : .active
+        return session.backendStatus == "running" ? .active : .neutral
     }
 
     static func pnlLine(_ session: SessionSummary) -> (label: String, value: MoneyAmount?)? {
+        if session.isHistorical { return ("Résultat réalisé net", session.realizedPnLNetQuote) }
         if let pnl = session.unrealizedPnLQuote, pnl.value != nil { return ("Résultat latent", pnl) }
         if let pnl = session.realizedPnLNetQuote, pnl.value != nil { return ("Résultat réalisé", pnl) }
         return session.isHistorical ? ("Résultat réalisé", nil) : nil
@@ -146,9 +150,11 @@ struct SessionsView: View {
     var loadNext: (String?) async -> Void = { _ in }
     var refresh: () async -> Void = {}
     var historyStore: RealSessionHistoryStore? = nil
+    var hasMore = false
 
     @State private var selectedFilter: SessionListFilter = .all
     @State private var searchText = ""
+    @State private var watchOnly = false
 
     private var isOffline: Bool {
         if case .offline = content { return true }
@@ -165,7 +171,7 @@ struct SessionsView: View {
     }
 
     private var filteredItems: [SessionSummary] {
-        SessionsPresentation.filtered(visibleItems ?? [], filter: selectedFilter, query: searchText)
+        SessionsPresentation.filtered(visibleItems ?? [], filter: selectedFilter, query: searchText).filter { !watchOnly || SessionsPresentation.shouldWatch($0) }
     }
 
     private var activeItems: [SessionSummary] { filteredItems.filter { !$0.isHistorical } }
@@ -179,13 +185,15 @@ struct SessionsView: View {
                     header
                     banners
                     contentView
+                    if hasMore { PremiumSecondaryButton(title: "Charger d’autres sessions") { Task { await loadNext(nil) } } }
                 }
                 .padding()
                 .safeAreaPadding(.bottom, BotaplataSpacing.xl)
             }
         }
         .navigationTitle("Sessions")
-        .searchable(text: $searchText, prompt: "Paire, provider, stratégie")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .refreshable { await refresh() }
     }
 
@@ -194,17 +202,12 @@ struct SessionsView: View {
             Text("Sessions")
                 .font(BotaplataTypography.largeTitle)
                 .foregroundStyle(BotaplataColors.textPrimary)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack {
-                    ForEach(SessionListFilter.allCases) { filter in
-                        Button { selectedFilter = filter } label: {
-                            FilterPill(title: filter.title, isSelected: selectedFilter == filter)
-                        }
-                        .accessibilityLabel("Filtre \(filter.title)")
-                        .accessibilityAddTraits(selectedFilter == filter ? .isSelected : [])
-                    }
-                }
-            }
+            PremiumEyebrow(title: "Supervision des sessions réelles")
+            PremiumSegmentedControl(title: "Sessions", options: [.all, .active, .history], selection: $selectedFilter, label: { $0.title })
+            PremiumSearchField(placeholder: "Paire ou stratégie · sessions chargées", text: $searchText)
+            Toggle("À surveiller uniquement", isOn: $watchOnly)
+                .font(.caption).tint(BotaplataColors.accent)
+
         }
     }
 
@@ -240,11 +243,11 @@ struct SessionsView: View {
 
     @ViewBuilder private var sessionSections: some View {
         if !activeItems.isEmpty {
-            SectionHeader(title: "Sessions en cours", subtitle: nil)
+            SectionHeader(title: "Sessions non terminées", subtitle: nil)
             rows(activeItems)
         }
         if !historicalItems.isEmpty {
-            SectionHeader(title: "Historique", subtitle: nil)
+            SectionHeader(title: "Sessions terminées", subtitle: nil)
             rows(historicalItems)
         }
     }
@@ -275,7 +278,7 @@ struct PremiumSessionCard: View {
     let session: SessionSummary
 
     private var subtitle: String {
-        [session.strategyName, session.providerLabel ?? session.provider.displayName]
+        [SessionArchivePresentation.strategy(name: session.strategyName, version: session.strategyVersion), session.providerLabel ?? session.provider.displayName]
             .compactMap { $0 }
             .joined(separator: " · ")
     }
@@ -292,25 +295,24 @@ struct PremiumSessionCard: View {
         PremiumCard(variant: SessionsPresentation.shouldWatch(session) ? .warning : .normal) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
+                    PremiumAssetIcon(pair: session.pair)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(session.pair).font(BotaplataTypography.cardTitle)
                         Text(subtitle).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary)
                     }
-                    Spacer()
-                    StatusPill(status: SessionsPresentation.status(session), text: SessionsPresentation.statusText(session))
                 }
-                Text(SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.headline)
-                Text(session.lifecycle.userMessage).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary).lineLimit(2)
-                HStack {
-                    if let pnlLabel {
-                        VStack(alignment: .leading) {
-                            Text(pnlLabel).font(.caption).foregroundStyle(BotaplataColors.textMuted)
-                            Text(formattedPnL).font(BotaplataTypography.monoValue).foregroundStyle(BotaplataColors.textPrimary).monospacedDigit()
-                        }
+                PremiumStatusBadge(status: SessionsPresentation.status(session), text: SessionsPresentation.statusText(session))
+
+                Text(session.isHistorical ? "Session terminée" : SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.headline)
+                Text(session.isHistorical ? "Session terminée · données enregistrées" : session.lifecycle.userMessage).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary)
+                if let pnlLabel {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(pnlLabel).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                        PremiumValueLabel(value: formattedPnL, tone: .pnl(SessionsPresentation.pnlLine(session)?.value), font: BotaplataTypography.monoValue)
                     }
-                    Spacer()
-                    FreshnessBadge(freshness: session.freshness)
                 }
+                FreshnessBadge(freshness: session.freshness)
+
                 if let started = session.startedAt {
                     Text("Depuis \(HistoryPresentation.fullDate(started))").font(.caption).foregroundStyle(BotaplataColors.textMuted)
                 }
@@ -318,7 +320,7 @@ struct PremiumSessionCard: View {
                 if let quantity = session.baseQuantity, quantity > 0 {
                     Text("Position · \(FinancialFormatters.decimal(quantity, min: 2, max: 8)) unités").font(.caption)
                 }
-                Text("Capital : non fourni par l’API réelle").font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                if let stopped = session.stoppedAt { Text("Terminée le \(HistoryPresentation.fullDate(stopped))").font(.caption).foregroundStyle(BotaplataColors.textMuted) }
                 Text(freshnessText).font(.caption).foregroundStyle(BotaplataColors.textMuted)
             }
         }
@@ -353,17 +355,19 @@ struct SessionDetailContainerView: View {
             PremiumBackground()
             detailContent
         }
-        .navigationTitle("Détail")
+        .navigationTitle("Session \(sessionID)")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .task(id: sessionID) { await load() }
     }
 
     @ViewBuilder private var detailContent: some View {
         switch content {
-        case let .loaded(session), let .refreshing(.some(session)), let .offline(.some(session)), let .stale(session), let .loadedFromCache(session):
+        case let .loaded(session), let .refreshing(.some(session)), let .offline(.some(session)), let .stale(session), let .loadedFromCache(session), let .partial(session):
             SessionDetailContent(session: session, selectedSection: $selectedSection, compact: false, historyStore: historyStore, isOffline: isOffline)
         case .error:
             PremiumErrorState(title: "Impossible de charger la session", message: "Vérifiez la connexion au serveur Botaplata.").padding()
-        case .idle, .loading, .refreshing(nil), .offline(nil), .partial:
+        case .idle, .loading, .refreshing(nil), .offline(nil):
             VStack(spacing: BotaplataSpacing.md) { PremiumSkeletonCard(); PremiumSkeletonCard(); PremiumSkeletonCard() }.padding()
         }
     }
@@ -391,7 +395,7 @@ struct SessionDetailContent: View {
     @Environment(RealStrategyExplanationStore.self) private var strategyExplanationStore
 
     private var headerSubtitle: String {
-        [session.providerLabel ?? session.provider.displayName, session.strategyName]
+        [session.providerLabel ?? session.provider.displayName, SessionArchivePresentation.strategy(name: session.strategyName, version: session.strategyVersion)]
             .compactMap { $0 }
             .joined(separator: " · ")
     }
@@ -413,28 +417,32 @@ struct SessionDetailContent: View {
     }
 
     private var detailHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(session.pair).font(.title.bold())
-            Text(headerSubtitle).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
-            Text(SessionsPresentation.lifecycleTitle(session.lifecycle)).font(.subheadline)
-            Text(freshnessText).font(.caption).foregroundStyle(BotaplataColors.textMuted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 8) {
+            PremiumEyebrow(title: "Session \(session.id) · lecture seule")
+            HStack(alignment: .top, spacing: 12) {
+                PremiumAssetIcon(pair: session.pair)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(session.pair).font(BotaplataTypography.screenTitle)
+                    Text(headerSubtitle).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                }
+            }
+            PremiumStatusBadge(status: session.isHistorical ? .neutral : DashboardPresentation.primaryBadgeStatus(session), text: session.isHistorical ? "Terminée" : DashboardPresentation.primaryBadgeText(session))
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var primarySections: [NotificationNavigationTarget.Section] { [.overview, .analysis, .orders, .journal] }
     private var detailSections: [NotificationNavigationTarget.Section] { [.overview, .analysis, .chart, .orders, .journal, .decisions] }
-
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var sectionSelector: some View {
-        Picker("Section de la session", selection: $selectedSection) {
-            ForEach(detailSections, id: \.self) { section in
-                Label(section.title, systemImage: section.symbol).tag(section)
+        VStack(alignment: .leading, spacing: 4) {
+            if !dynamicTypeSize.isAccessibilitySize {
+                PremiumSegmentedControl(title: "Section", options: primarySections, selection: $selectedSection, label: { $0 == .overview ? "Résumé" : $0.title })
             }
+            Picker("Toutes les sections", selection: $selectedSection) {
+                ForEach(detailSections, id: \.self) { section in Label(section.title, systemImage: section.symbol).tag(section) }
+            }.pickerStyle(.menu).frame(minHeight: 44)
+                .accessibilityLabel("Toutes les sections, \(selectedSection.title)")
         }
-        .pickerStyle(.menu)
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .accessibilityLabel("Section : \(selectedSection.title)")
-        .padding(.horizontal, 8)
-        .background(BotaplataColors.cardGlass, in: RoundedRectangle(cornerRadius: 12))
     }
 
     @ViewBuilder private var sectionContent: some View {
@@ -459,16 +467,22 @@ struct SessionDetailContent: View {
             LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) {
                 if isOffline { PremiumOfflineBanner() }
                 ForEach(session.warnings) { WarningBanner(warning: $0) }
-                ReconciliationCard(session: session)
-                SupervisionStrip(session: session, cached: isOffline, offline: isOffline)
+                PremiumSessionMetricsGrid(session: session)
                 PremiumMarketSection(session: session)
-                DecisionSummaryCard(session: session, detailed: true)
-                StrategyConditionsCard(decision: session.decision)
-                PositionCard(session: session)
-                if let order = session.activeOrder { ActiveOrderCard(order: order) }
-                PremiumSessionPerformanceCard(session: session)
-                FeeAwareCard(fee: session.feeAware)
-                HealthFreshnessCard(session: session, cached: isOffline)
+                PremiumPerformanceUnavailableCard()
+                DecisionSummaryCard(session: session, detailed: false)
+                if let historyStore { PremiumRecentEventsSection(sessionID: session.id, store: historyStore) }
+                DisclosureGroup("Position, frais et état du moteur") {
+                    VStack(alignment: .leading, spacing: 16) {
+                        PositionCard(session: session)
+                        PremiumSessionPerformanceCard(session: session)
+                        FeeAwareCard(fee: session.feeAware)
+                        HealthFreshnessCard(session: session, cached: isOffline)
+                        if session.reconciliation != nil { ReconciliationCard(session: session) }
+                        if let order = session.activeOrder { ActiveOrderCard(order: order) }
+                    }.padding(.top, 12)
+                }.font(.subheadline.weight(.semibold))
+
             }
             .padding()
         }
@@ -568,7 +582,7 @@ struct StrategyExplanationSectionView: View {
             }
             .padding()
         }
-        .task(id: scenePhase) { if scenePhase == .active { await store.load(sessionID: session.id, reason: "sectionOpened") } else { store.cancel(sessionID: session.id) } }
+        .task(id: "\(session.id):\(scenePhase == .active)") { if scenePhase == .active { await store.load(sessionID: session.id, reason: "sectionOpened") } else { store.cancel(sessionID: session.id) } }
         .refreshable { await store.refresh(sessionID: session.id) }
         .onDisappear { store.cancel(sessionID: session.id) }
     }
@@ -609,11 +623,11 @@ struct StrategyExplanationContent: View {
         VStack(alignment: .leading, spacing: BotaplataSpacing.md) {
             StrategyDecisionHeroCard(explanation: explanation)
             StrategyScoreCard(score: explanation.score)
-            PremiumReboundCard(conditions: explanation.conditions)
-            StrategyConditionsExplanationCard(conditions: explanation.conditions)
-            if !explanation.blockers.isEmpty { StrategyBlockersCard(blockers: explanation.blockers) }
-            StrategyMarketCard(market: explanation.market)
             StrategyIndicatorsCard(indicators: explanation.indicators.indicators)
+            PremiumReboundCard(conditions: explanation.conditions)
+            StrategyMarketCard(market: explanation.market)
+            if !explanation.blockers.isEmpty { StrategyBlockersCard(blockers: explanation.blockers) }
+            StrategyConditionsExplanationCard(conditions: explanation.conditions)
             StrategyAnalysisBaseCard(analysis: explanation.analysis)
             if let p = explanation.positionProtection {
                 StrategyPositionProtectionCard(protection: p)
@@ -658,7 +672,8 @@ struct StrategyScoreCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Score d’entrée").font(.headline)
                 if let score {
-                    Text("\(score.currentRaw ?? "—") / \(score.requiredRaw ?? "—") requis").font(.title.bold().monospacedDigit())
+                    PremiumValueLabel(value: score.currentRaw ?? "Indisponible")
+                    Text("Seuil d’entrée : \(score.requiredRaw ?? "indisponible")").font(.subheadline).monospacedDigit().foregroundStyle(BotaplataColors.textSecondary)
                     if let maximum = score.maximum, maximum > 0, maximum <= 20, let current = score.current {
                         HStack(spacing: 5) {
                             ForEach(0..<maximum, id: \.self) { i in
@@ -671,7 +686,7 @@ struct StrategyScoreCard: View {
                 } else {
                     Text("Score non fourni").foregroundStyle(BotaplataColors.textSecondary)
                 }
-                Text("Le score d’entrée ne contient pas de points ajoutés pour le rebond.").font(.caption).foregroundStyle(BotaplataColors.textMuted)
+                Text("Le score seul n’autorise pas un achat. Les confirmations, la disponibilité des données et les veto ci-dessous restent indépendants.").font(.caption).foregroundStyle(BotaplataColors.textMuted)
             }
         }
     }
@@ -791,7 +806,7 @@ struct StrategyIndicatorsCard: View {
                         }.accessibilityElement(children: .combine)
                     }
                 }
-                Text("Une valeur disponible peut être défavorable à la stratégie. Les conditions ci-dessus restent la référence.").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                Text("Une valeur disponible peut être défavorable à la stratégie. Les conditions et veto du backend restent la référence.").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
                 DisclosureGroup("Comprendre les indicateurs") {
                     ForEach(indicators) { indicator in
                         Text("\(indicator.name) : \(indicator.help)").font(.caption).padding(.vertical, 3)

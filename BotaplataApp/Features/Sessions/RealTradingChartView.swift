@@ -121,7 +121,7 @@ private func dbl(_ decimal: Decimal) -> Double {
 
 enum TradingChartPresentation {
     static func nearestCandle(to date: Date, in candles: [ChartRenderableCandle]) -> ChartRenderableCandle? {
-        guard var best = candles.first else {
+        guard candles.contains(where: { $0.openTime <= date && date <= $0.closeTime }), var best = candles.first else {
             return nil
         }
 
@@ -183,7 +183,12 @@ enum TradingChartPresentation {
         var current: [ChartIndicatorPoint] = []
         var index = 0
 
+        var previousClose: Date?
         for candle in candles {
+            if let previousClose, candle.openTime.timeIntervalSince(previousClose) > 1, !current.isEmpty {
+                segments.append(current); current = []; index += 1
+            }
+            previousClose = candle.closeTime
             if let raw = value(candle), raw.isFinite {
                 current.append(
                     ChartIndicatorPoint(
@@ -274,7 +279,7 @@ struct RealTradingChartSection: View {
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         RealTradingChartView(
-            state: store.state,
+            state: matchingState,
             selectedRange: store.selectedRange,
             select: { store.selectRange($0, sessionID: session.id) },
             refresh: { store.refresh(sessionID: session.id) }
@@ -282,6 +287,13 @@ struct RealTradingChartSection: View {
         .task(id: "\(session.id):\(scenePhase == .active)") { if scenePhase == .active { store.load(sessionID: session.id) } else { store.stop() } }
         .onDisappear { store.stop() }
         .refreshable { store.refresh(sessionID: session.id) }
+    }
+    private var matchingState: RealSessionChartState {
+        switch store.state {
+        case .loaded(let chart), .refreshing(let chart), .offline(let chart):
+            return chart.sessionID == session.id ? store.state : .loading
+        default: return store.state
+        }
     }
 }
 
@@ -304,6 +316,14 @@ struct RealTradingChartView: View {
             }
             .padding()
             .safeAreaPadding(.bottom, BotaplataSpacing.xxl)
+        }
+        .onChange(of: selectedRange) { _, _ in selected = nil }
+        .onChange(of: state) { _, newState in
+            guard let old = selected else { return }
+            switch newState {
+            case .loaded(let chart), .refreshing(let chart), .offline(let chart): selected = RealTradingChartRenderModel.make(chart: chart).candles.first { $0.id == old.id }
+            default: selected = nil
+            }
         }
     }
 
@@ -356,10 +376,8 @@ struct RealTradingChartView: View {
     private func chartContent(chart: TradingChart, model: RealTradingChartRenderModel) -> some View {
         VStack(alignment: .leading, spacing: BotaplataSpacing.lg) {
             MarketSummary(chart: chart)
-            PremiumCard {
+            PremiumChartContainer(title: "Graphique de marché", subtitle: "Bougies \(chart.timeframe) · \(chart.quoteAsset)") {
                 VStack(alignment: .leading, spacing: TradingChartPresentation.chartCardSpacing) {
-                    Text("Graphique")
-                        .font(BotaplataTypography.cardTitle)
                     IndicatorControls(
                         model: model,
                         showVWAP: $showVWAP,
@@ -388,7 +406,7 @@ struct RealTradingChartView: View {
             ForEach(chart.warnings) { warning in
                 WarningBanner(warning: warning)
             }
-            Text("Dernière actualisation : \(HistoryPresentation.fullDate(chart.generatedAt))")
+            Text("Graphique généré : \(HistoryPresentation.fullDate(chart.generatedAt))")
                 .font(.caption)
                 .foregroundStyle(BotaplataColors.textSecondary)
         }
@@ -398,21 +416,8 @@ struct RealTradingChartView: View {
 struct ChartRangeSelector: View {
     let selected: TradingChartRange
     let select: (TradingChartRange) -> Void
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4), spacing: 4) {
-            ForEach(TradingChartRange.allCases, id: \.self) { range in
-                Button { select(range) } label: {
-                    Text(range.displayTitle).font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .foregroundStyle(range == selected ? BotaplataColors.textPrimary : BotaplataColors.textSecondary)
-                        .background(range == selected ? BotaplataColors.primaryTeal.opacity(0.16) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Période \(range.displayTitle)")
-                .accessibilityAddTraits(range == selected ? .isSelected : [])
-            }
-        }
+        PremiumSegmentedControl(title: "Période", options: TradingChartRange.allCases, selection: Binding(get: { selected }, set: select), label: { $0.displayTitle })
     }
 }
 
@@ -424,20 +429,24 @@ struct CandlestickChart: View {
     @Binding var selected: ChartRenderableCandle?
 
     @State private var availableWidth: CGFloat = 0
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        chart
-            .frame(maxWidth: .infinity)
-            .frame(height: TradingChartPresentation.priceChartHeight)
-            .background(
-                GeometryReader { geometry in
-                    Color.clear
-                        .onAppear { availableWidth = geometry.size.width }
+        VStack(alignment: .leading, spacing: 12) {
+            chart
+                .font(.caption)
+                .frame(maxWidth: .infinity)
+                .frame(height: TradingChartPresentation.priceChartHeight)
+                .background(GeometryReader { geometry in
+                    Color.clear.onAppear { availableWidth = geometry.size.width }
                         .onChange(of: geometry.size.width) { _, newWidth in availableWidth = newWidth }
-                }
-            )
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(accessibilitySummary)
+                })
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(accessibilitySummary)
+            if dynamicTypeSize.isAccessibilitySize, let selected {
+                ChartTooltip(candle: selected, quoteAsset: model.chart.quoteAsset)
+            }
+        }
     }
 
     private var chart: some View {
@@ -457,7 +466,7 @@ struct CandlestickChart: View {
                 .clipShape(RoundedRectangle(cornerRadius: BotaplataRadius.sm, style: .continuous))
         }
         .chartOverlay { proxy in chartOverlayContent(proxy: proxy) }
-        .overlay(alignment: tooltipAlignment) { tooltipContent }
+        .overlay(alignment: tooltipAlignment) { if !dynamicTypeSize.isAccessibilitySize { tooltipContent } }
     }
 
     @ChartContentBuilder private var candlestickContent: some Charts.ChartContent {
@@ -479,6 +488,9 @@ struct CandlestickChart: View {
             .foregroundStyle(candleColor(for: candle))
             .opacity(candle.isClosed ? 1 : 0.55)
             .accessibilityLabel(candleAccessibilityLabel(candle))
+            if candle.open == candle.close {
+                PointMark(x: .value("Date", candle.openTime), y: .value("Prix", candle.close)).symbol(.square).symbolSize(8).foregroundStyle(candleColor(for: candle))
+            }
         }
     }
 
@@ -529,7 +541,7 @@ struct CandlestickChart: View {
                         y: .value(label, point.value),
                         series: .value("Segment", point.segment)
                     )
-                    .foregroundStyle(color)
+                    .foregroundStyle(color).interpolationMethod(.linear)
                 }
             }
         }
@@ -573,21 +585,21 @@ struct CandlestickChart: View {
     }
 
     @AxisContentBuilder private var chartXAxis: some AxisContent {
-        AxisMarks(values: .automatic(desiredCount: TradingChartPresentation.xAxisDesiredCount(for: model.chart.range, candleCount: model.candles.count))) {
+        AxisMarks(values: .automatic(desiredCount: dynamicTypeSize.isAccessibilitySize ? 2 : TradingChartPresentation.xAxisDesiredCount(for: model.chart.range, candleCount: model.candles.count))) {
             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
             AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
             AxisValueLabel(format: TradingChartPresentation.axisFormat(for: model.chart.range), centered: false)
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(BotaplataColors.textSecondary)
         }
     }
 
     @AxisContentBuilder private var chartYAxis: some AxisContent {
-        AxisMarks(position: .trailing, values: .automatic(desiredCount: 5)) {
+        AxisMarks(position: .trailing, values: .automatic(desiredCount: dynamicTypeSize.isAccessibilitySize ? 3 : 5)) {
             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
             AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
             AxisValueLabel()
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(BotaplataColors.textSecondary)
         }
     }
@@ -637,7 +649,7 @@ struct CandlestickChart: View {
     }
 
     private func candleAccessibilityLabel(_ candle: ChartRenderableCandle) -> String {
-        "Bougie \(candle.isClosed ? "clôturée" : "ouverte") ouverture \(candle.open) haut \(candle.high) bas \(candle.low) clôture \(candle.close)"
+        "Bougie \(HistoryPresentation.fullDate(candle.openTime)), \(candle.isClosed ? "clôturée" : "ouverte") ouverture \(candle.open) haut \(candle.high) bas \(candle.low) clôture \(candle.close)"
     }
 
     private func markerSymbol(for kind: TradingMarkerKind) -> String {
@@ -663,7 +675,7 @@ struct CandlestickChart: View {
     }
 
     private func markerAccessibilityLabel(_ marker: ChartRenderableMarker) -> String {
-        "Marqueur \(marker.title) prix \(marker.price)"
+        "Marqueur \(marker.title), \(HistoryPresentation.fullDate(marker.timestamp)), prix \(marker.price) \(model.chart.quoteAsset)"
     }
 
     private func chartOverlayContent(proxy: ChartProxy) -> some View {
@@ -696,9 +708,7 @@ struct CandlestickChart: View {
                     in: model.candles
                 )
             }
-            .onEnded { _ in
-                selected = nil
-            }
+
     }
 }
 
@@ -707,7 +717,7 @@ struct ChartLevelAnnotation: View {
 
     var body: some View {
         Text(level.title)
-            .font(.caption2)
+            .font(.caption)
             .padding(.vertical, 2)
             .foregroundStyle(BotaplataColors.textSecondary)
     }
@@ -755,19 +765,16 @@ struct IndicatorControls: View {
     @Binding var showBollinger: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: BotaplataSpacing.sm) {
-            if model.hasVWAP {
-                Toggle("VWAP", isOn: $showVWAP)
-            }
-            if model.hasEMA200 {
-                Toggle("EMA200", isOn: $showEMA200)
-            }
-            if model.hasBollinger {
-                Toggle("Bollinger", isOn: $showBollinger)
-            }
-        }
-        .font(.caption)
+        Menu {
+            if model.hasVWAP { Toggle("VWAP", isOn: $showVWAP) }
+            if model.hasEMA200 { Toggle("EMA200", isOn: $showEMA200) }
+            if model.hasBollinger { Toggle("Bollinger", isOn: $showBollinger) }
+        } label: {
+            Label("Indicateurs superposés", systemImage: "slider.horizontal.3").font(.subheadline).frame(minHeight: 44)
+        }.disabled(!model.hasVWAP && !model.hasEMA200 && !model.hasBollinger)
+            .accessibilityHint("Modifie uniquement les courbes affichées, sans changer la stratégie")
     }
+
 }
 
 struct MarketSummary: View {
@@ -817,7 +824,7 @@ struct ChartTooltip: View {
                 valueRow("Bollinger milieu", value: candle.bollingerMiddle, suffix: quoteAsset)
                 valueRow("Bollinger basse", value: candle.bollingerLower, suffix: quoteAsset)
                 Text(candle.isClosed ? "Bougie clôturée" : "Bougie ouverte")
-                    .font(.caption2)
+                    .font(.caption)
             }
             .font(.caption)
             .monospacedDigit()
@@ -877,13 +884,14 @@ struct ChartLegend: View {
     let showVWAP: Bool
     let showEMA200: Bool
     let showBollinger: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: BotaplataSpacing.xs)], alignment: .leading, spacing: BotaplataSpacing.xs) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 160 : 100), spacing: BotaplataSpacing.xs)], alignment: .leading, spacing: BotaplataSpacing.xs) {
             ForEach(legendItems, id: \.self) { item in
                 Text(item)
-                    .font(.caption2.weight(.semibold))
-                    .lineLimit(1)
+                    .font(.caption.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .frame(maxWidth: .infinity, alignment: .leading)

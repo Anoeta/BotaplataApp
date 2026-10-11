@@ -4,7 +4,7 @@ final class ProductionFixtureAuditTests: XCTestCase {
     func testProductionRootDoesNotUseProfileFixtures() throws {
         let root = try String(contentsOfFile: "BotaplataApp/App/RootView.swift")
         XCTAssertFalse(root.contains("ProfileView(profile: PreviewFixtures.profile)"))
-        XCTAssertTrue(root.contains("ProfileContainerView(store: profileStore)"))
+        XCTAssertTrue(root.contains("ProfileContainerView(store: profileStore, pushStore: pushStore)"))
     }
 
     func testDiagnosticCopyShapeDoesNotContainSecretWords() throws {

@@ -7,19 +7,22 @@ struct DashboardContainerView: View {
     @Environment(AppRouter.self) private var router
     @Environment(RealStrategyExplanationStore.self) private var strategyStore
     @Environment(RealSessionChartStore.self) private var chartStore
+    @Environment(RealSessionHistoryStore.self) private var historyStore
     var body: some View {
         DashboardView(
             content: store.content,
             unreadCount: pushStore.unreadCount,
             openAlerts: { router.selectedTab = .dashboard; router.dashboardPath.append("alerts") },
-            openSession: { id in router.selectedTab = .sessions; router.sessionsPath.append(SessionRoute.detail(id: id, section: .analysis)) },
+            openSession: { id in router.selectedTab = .sessions; router.sessionsPath.append(SessionRoute.detail(id: id, section: .overview)) },
             refresh: {
                 await store.refresh(reason: .manualRefresh, force: true)
                 if let id = sessionID {
                     await strategyStore.refresh(sessionID: id)
                     chartStore.refresh(sessionID: id)
                 }
-            }
+            },
+            historyStore: historyStore,
+            openAnalysis: { id in router.selectedTab = .sessions; router.sessionsPath.append(SessionRoute.detail(id: id, section: .analysis)) }
         )
         .task { store.start() }
         .task(id: analysisActivityKey) {
@@ -35,7 +38,7 @@ struct DashboardContainerView: View {
             store.stop()
             if let id = sessionID { strategyStore.cancel(sessionID: id) }
         }
-        .navigationDestination(for: String.self) { route in if route == "alerts" { AlertsCenterView(store: pushStore) } }
+        .navigationDestination(for: String.self) { route in if route == "alerts" { AlertsCenterView(store: pushStore).toolbar(.visible, for: .navigationBar) } }
         .onChange(of: scenePhase) { _, phase in if phase != .active { store.enterBackground(); if let id = sessionID { strategyStore.cancel(sessionID: id) } } else if phase == .active { store.enterForeground() } }
     }
     private var sessionID: String? {

@@ -21,22 +21,27 @@ struct ProfileView: View {
     @State private var showingDiagnostic = false
 
     var body: some View {
-        ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { header; stateBanner; appearanceCard; securityCard; devicesCard; notificationsCard; DisclosureGroup("Serveur et application") { serverCard; aboutCard }; logoutCard }.padding(BotaplataSpacing.md) } }
+        ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { Text("Profil").font(BotaplataTypography.largeTitle).accessibilityAddTraits(.isHeader); header; stateBanner; serverCard; appearanceCard; notificationsCard; DisclosureGroup("Sécurité et appareils") { securityCard; devicesCard }; aboutCard; logoutCard }.padding(BotaplataSpacing.md) } }
             .navigationTitle("Profil")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.bootstrap(); await pushStore.refreshAll(force: true) }
-            .sheet(isPresented: $showingAbout) { NavigationStack { AboutBotaplataView(diagnostic: store.diagnostic) } }
-            .navigationDestination(isPresented: $showingDiagnostic) { DiagnosticView(diagnostic: store.diagnostic, permissionStatus: pushStore.permissionStatus) }
+            .sheet(isPresented: $showingAbout) { NavigationStack { AboutBotaplataView(diagnostic: store.diagnostic).toolbar(.visible, for: .navigationBar) } }
+            .navigationDestination(isPresented: $showingDiagnostic) { DiagnosticView(diagnostic: store.diagnostic, permissionStatus: pushStore.permissionStatus).toolbar(.visible, for: .navigationBar) }
             .alert("Se déconnecter de Botaplata ?", isPresented: $confirmsLogout) { Button("Annuler", role: .cancel) {}; Button("Se déconnecter", role: .destructive) { Task { await logout() } } } message: { Text("Vous devrez saisir à nouveau votre mot de passe et votre code de vérification.") }
             .overlay(alignment: .bottom) { if let message = store.message { Text(message).font(.footnote).padding().background(BotaplataColors.backgroundElevated.opacity(0.96), in: Capsule()).foregroundStyle(BotaplataColors.textPrimary).padding().accessibilityLabel(message) } }
     }
 
     private var appearanceCard: some View {
         PremiumCard {
+            PremiumSectionHeader(title: "Préférences d’affichage", subtitle: "Réglages de cet iPhone")
             Picker("Apparence", selection: $appearance) {
                 Text("Système").tag("system")
                 Text("Sombre").tag("dark")
                 Text("Clair").tag("light")
-            }.pickerStyle(.menu)
+            }.pickerStyle(.menu).frame(minHeight: 44)
+            profileRow("Langue", value: "Français", detail: "Langue actuelle de l’interface.", symbol: "globe")
+            profileRow("Devise", value: "Devise fournie par le backend", detail: "Chaque valeur conserve sa devise. Aucune conversion de portefeuille n’est appliquée.", symbol: "banknote")
         }
     }
 
@@ -45,7 +50,7 @@ struct ProfileView: View {
 
     private var securityCard: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { ProfileSectionHeader(title: "Sécurité", icon: "lock.shield", status: "Accès local"); profileRow("Face ID", value: store.biometricText, detail: "Face ID verrouille l’application sur cet iPhone.", symbol: "faceid"); Toggle(isOn: Binding(get: { store.biometricLockEnabled }, set: { value in Task { await store.setBiometricLockEnabled(value) } })) { VStack(alignment: .leading, spacing: 3) { Text("Verrouillage local").font(BotaplataTypography.body); Text(ProfilePresentation.biometricMicrocopy(availability: store.biometricAvailability)).font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.textSecondary) } }.disabled(store.biometricAvailability != .available && !store.biometricLockEnabled).tint(BotaplataColors.primaryTeal).accessibilityLabel("Face ID, \(store.biometricText). Protège l’accès local à Botaplata."); profileRow("Double vérification", value: "Vérification à la connexion", detail: "Le code est validé par le backend lors de l’authentification.", symbol: "number.circle"); profileRow("Session actuelle", value: store.currentDevice?.isCurrent == true ? "Appareil reconnu" : "État à actualiser", detail: "Consultez les appareils pour vérifier le dernier état reçu du backend.", symbol: "iphone"); if store.biometricAvailability == .available || store.biometricLockEnabled { PremiumSecondaryButton(title: "Verrouiller maintenant", action: lockNow).accessibilityLabel("Verrouiller Botaplata maintenant") } } } }
 
-    private var devicesCard: some View { NavigationLink { AuthorizedDevicesView(store: store) } label: { PremiumCard { HStack(alignment: .center, spacing: BotaplataSpacing.md) { IconBadge(symbol: "iphone.gen3", label: "Appareils", color: BotaplataColors.primaryMint); VStack(alignment: .leading, spacing: 5) { Text("Appareils autorisés").font(BotaplataTypography.cardTitle); Text(ProfilePresentation.devicesSummary(current: store.currentDevice, others: store.otherDevices.count)).foregroundStyle(BotaplataColors.textSecondary); Text("Gérer les appareils").font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.primaryMint) }; Spacer(); Image(systemName: "chevron.right").foregroundStyle(BotaplataColors.textMuted) } } }.buttonStyle(.plain).accessibilityLabel("Appareils autorisés, \(ProfilePresentation.devicesSummary(current: store.currentDevice, others: store.otherDevices.count))") }
+    private var devicesCard: some View { NavigationLink { AuthorizedDevicesView(store: store).toolbar(.visible, for: .navigationBar) } label: { PremiumCard { HStack(alignment: .center, spacing: BotaplataSpacing.md) { IconBadge(symbol: "iphone.gen3", label: "Appareils", color: BotaplataColors.primaryMint); VStack(alignment: .leading, spacing: 5) { Text("Appareils autorisés").font(BotaplataTypography.cardTitle); Text(ProfilePresentation.devicesSummary(current: store.currentDevice, others: store.otherDevices.count)).foregroundStyle(BotaplataColors.textSecondary); Text("Gérer les appareils").font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.primaryMint) }; Spacer(); Image(systemName: "chevron.right").foregroundStyle(BotaplataColors.textMuted) } } }.buttonStyle(.plain).accessibilityLabel("Appareils autorisés, \(ProfilePresentation.devicesSummary(current: store.currentDevice, others: store.otherDevices.count))") }
 
     private var notificationsCard: some View {
         PremiumCard {
@@ -63,8 +68,8 @@ struct ProfileView: View {
                 } else if pushStore.permissionStatus == .notDetermined {
                     PremiumSecondaryButton(title: "Activer les notifications") { Task { await pushStore.requestPermission() } }
                 }
-                preferencesSummary
-                NavigationLink { PushPreferencesView(store: pushStore) } label: { HStack { Text("Réglages des notifications").font(BotaplataTypography.body); Spacer(); Image(systemName: "chevron.right") } }.buttonStyle(.plain)
+                DisclosureGroup("Événements suivis") { preferencesSummary }
+                NavigationLink { PushPreferencesView(store: pushStore).toolbar(.visible, for: .navigationBar) } label: { HStack { Text("Réglages des notifications").font(BotaplataTypography.body); Spacer(); Image(systemName: "chevron.right") } }.buttonStyle(.plain)
             }
         }
     }
@@ -77,14 +82,33 @@ struct ProfileView: View {
 
     @ViewBuilder private var preferencesSummary: some View { let prefs = ProfilePresentation.preferenceRows(pushStore.currentPreferencesSnapshot()); ForEach(prefs.prefix(4), id: \.title) { row in profileRow(row.title, value: row.value, detail: row.detail, symbol: row.symbol) } }
     private var serverCard: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { ProfileSectionHeader(title: "Serveur Botaplata", icon: "server.rack", status: store.diagnostic.isBackendConfigured ? "Configuré" : "Non configuré"); profileRow("Statut", value: store.diagnostic.isBackendConfigured ? "Adresse configurée" : "Non configuré", detail: nil, symbol: "network"); profileRow("Environnement", value: store.diagnostic.environment, detail: nil, symbol: "shippingbox"); profileRow("Dernière notification enregistrée", value: ProfilePresentation.lastSyncText(pushStore.summary?.latestCreatedAt), detail: "La configuration locale ne certifie ni la connexion ni la santé du backend.", symbol: "clock"); Button { showingDiagnostic = true } label: { HStack { Text("Diagnostic léger"); Spacer(); Image(systemName: "chevron.right") } }.foregroundStyle(BotaplataColors.primaryMint) } } }
-    private var aboutCard: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { ProfileSectionHeader(title: "À propos", icon: "info.circle", status: "Version \(store.diagnostic.appVersion)"); profileRow("Botaplata", value: "Version \(store.diagnostic.appVersion) (\(store.diagnostic.build))", detail: "Supervision sécurisée de votre bot Kraken.", symbol: "app.badge"); profileRow("Vos données", value: "Protégées", detail: "Les identifiants Kraken restent sur votre serveur Botaplata. Cet iPhone ne stocke aucune clé Kraken.", symbol: "key.slash"); Button { showingAbout = true } label: { HStack { Text("Fonctionnement de l’app"); Spacer(); Image(systemName: "chevron.right") } }.foregroundStyle(BotaplataColors.primaryMint) } } }
+    private var aboutCard: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { PremiumSectionHeader(title: "À propos", subtitle: "Version \(store.diagnostic.appVersion)"); profileRow("Botaplata", value: "Version \(store.diagnostic.appVersion) (\(store.diagnostic.build))", detail: "Supervision sécurisée de votre bot Kraken.", symbol: "app.badge"); profileRow("Vos données", value: "Protégées", detail: "Les identifiants Kraken restent sur votre serveur Botaplata. Cet iPhone ne stocke aucune clé Kraken.", symbol: "key.slash"); Button { showingAbout = true } label: { HStack { Text("Fonctionnement de l’app"); Spacer(); Image(systemName: "chevron.right") } }.foregroundStyle(BotaplataColors.primaryMint) } } }
     private var logoutCard: some View { PremiumCard(variant: .danger) { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Text("Déconnexion").font(BotaplataTypography.cardTitle); Text("La session locale sera supprimée. L’onboarding déjà terminé reste conservé.").foregroundStyle(BotaplataColors.textSecondary); PremiumDangerButton(title: "Se déconnecter") { confirmsLogout = true }.accessibilityLabel("Se déconnecter de Botaplata") } } }
 
-    private func profileRow(_ title: String, value: String, detail: String?, symbol: String) -> some View { HStack(alignment: .top, spacing: BotaplataSpacing.sm) { Image(systemName: symbol).foregroundStyle(BotaplataColors.primaryMint).frame(width: 24); VStack(alignment: .leading, spacing: 3) { HStack { Text(title).font(BotaplataTypography.body); Spacer(); Text(value).font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.textSecondary) }; if let detail { Text(detail).font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.textMuted).fixedSize(horizontal: false, vertical: true) } } }.accessibilityElement(children: .combine) }
+    private func profileRow(_ title: String, value: String, detail: String?, symbol: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol).foregroundStyle(BotaplataColors.accent).frame(width: 24).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.subheadline.weight(.semibold))
+                Text(value).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary)
+                if let detail { Text(detail).font(.caption).foregroundStyle(BotaplataColors.textSecondary) }
+            }.fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+        }.accessibilityElement(children: .combine)
+    }
+
 }
 
 struct ProfileUserCard: View { let user: AuthenticatedUser?; var body: some View { PremiumCard(variant: .hero) { HStack(alignment: .center, spacing: BotaplataSpacing.md) { ZStack { Circle().fill(BotaplataColors.primaryTeal.opacity(0.24)).frame(width: 68, height: 68); Text(ProfilePresentation.initials(for: user)).font(.title2.bold()).foregroundStyle(BotaplataColors.primaryMint) }; VStack(alignment: .leading, spacing: 5) { Text(ProfilePresentation.displayName(for: user)).font(BotaplataTypography.largeTitle).minimumScaleFactor(0.7); if let email = ProfilePresentation.email(for: user) { Text(email).foregroundStyle(BotaplataColors.textSecondary) }; Text("Compte Botaplata · consultation").font(.caption).foregroundStyle(BotaplataColors.textSecondary) } } }.accessibilityElement(children: .combine) } }
-struct ProfileSectionHeader: View { let title: String; let icon: String; let status: String; var body: some View { HStack { Label(title, systemImage: icon).font(BotaplataTypography.cardTitle); Spacer(); StatusPill(status: .active, text: status) } } }
+struct ProfileSectionHeader: View {
+    let title: String; let icon: String; let status: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label(title, systemImage: icon).font(BotaplataTypography.cardTitle)
+            Text(status).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+        }.accessibilityElement(children: .combine)
+    }
+}
+
 
 struct AuthorizedDevicesView: View {
     @Bindable var store: ProfileStore

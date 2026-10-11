@@ -2,34 +2,40 @@ import SwiftUI
 import UIKit
 
 enum BotaplataColors {
-    private static func adaptive(light: UIColor, dark: UIColor) -> Color {
-        Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+    private static func adaptive(light: UIColor, dark: MidnightPalette) -> Color {
+        let hex = dark.rawValue
+        let midnight = UIColor(red: CGFloat((hex >> 16) & 0xff) / 255,
+                               green: CGFloat((hex >> 8) & 0xff) / 255,
+                               blue: CGFloat(hex & 0xff) / 255, alpha: 1)
+        return Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? midnight : light })
     }
-    static let backgroundDeep = adaptive(light: UIColor(red: 0.95, green: 0.97, blue: 0.99, alpha: 1), dark: UIColor(red: 0.025, green: 0.045, blue: 0.08, alpha: 1))
-    static let backgroundNavy = adaptive(light: .secondarySystemBackground, dark: UIColor(red: 0.04, green: 0.08, blue: 0.15, alpha: 1))
-    static let backgroundElevated = adaptive(light: .systemBackground, dark: UIColor(red: 0.055, green: 0.085, blue: 0.13, alpha: 1))
-    static let cardGlass = backgroundElevated
-    static let cardBorder = Color(uiColor: .separator).opacity(0.45)
-    static let primaryMint = adaptive(light: UIColor(red: 0.02, green: 0.42, blue: 0.34, alpha: 1), dark: UIColor(red: 0.35, green: 0.85, blue: 0.69, alpha: 1))
-    static let primaryTeal = primaryMint
-    static let accentCyan = adaptive(light: .systemBlue, dark: .systemCyan)
-    static let accentMagenta = Color(uiColor: .systemPink)
-    static let success = adaptive(light: UIColor(red: 0.07, green: 0.42, blue: 0.20, alpha: 1), dark: .systemGreen)
-    static let warning = adaptive(light: UIColor(red: 0.62, green: 0.32, blue: 0.02, alpha: 1), dark: .systemYellow)
-    static let danger = Color(uiColor: .systemRed)
-    static let textPrimary = Color(uiColor: .label)
-    static let textSecondary = Color(uiColor: .secondaryLabel)
-    static let textMuted = Color(uiColor: .secondaryLabel)
-    static let textDisabled = Color(uiColor: .tertiaryLabel)
-    static let separator = Color(uiColor: .separator)
-    static let graphite = Color(uiColor: .systemGray)
-    static let background = backgroundDeep
-    static let surface = backgroundElevated
-    static let card = backgroundElevated
-    static let elevated = backgroundNavy
-    static let accent = primaryTeal
-    static let neutral = Color(uiColor: .secondaryLabel)
-
+    static let background = adaptive(light: UIColor(red: 0.95, green: 0.97, blue: 0.99, alpha: 1), dark: .background)
+    static let surface = adaptive(light: .systemBackground, dark: .surface)
+    static let elevated = adaptive(light: .secondarySystemBackground, dark: .surfaceElevated)
+    static let border = adaptive(light: .separator, dark: .border)
+    static let textPrimary = adaptive(light: .label, dark: .textPrimary)
+    static let textSecondary = adaptive(light: .secondaryLabel, dark: .textSecondary)
+    static let accent = adaptive(light: UIColor(red: 0.02, green: 0.42, blue: 0.34, alpha: 1), dark: .accentMint)
+    static let success = adaptive(light: UIColor(red: 0.07, green: 0.42, blue: 0.20, alpha: 1), dark: .success)
+    static let danger = adaptive(light: UIColor(red: 0.65, green: 0.16, blue: 0.14, alpha: 1), dark: .loss)
+    static let warning = adaptive(light: UIColor(red: 0.57, green: 0.30, blue: 0.02, alpha: 1), dark: .warning)
+    static let info = adaptive(light: .systemBlue, dark: .info)
+    // Compatibility aliases keep existing authentication and supervision components coherent.
+    static let backgroundDeep = background
+    static let backgroundNavy = elevated
+    static let backgroundElevated = surface
+    static let cardGlass = surface
+    static let cardBorder = border
+    static let primaryMint = accent
+    static let primaryTeal = accent
+    static let accentCyan = info
+    static let accentMagenta = danger
+    static let textMuted = textSecondary
+    static let textDisabled = textSecondary
+    static let separator = border
+    static let graphite = textSecondary
+    static let card = surface
+    static let neutral = textSecondary
 }
 
 enum BotaplataGradients {
@@ -51,9 +57,10 @@ enum BotaplataTypography {
     static let screenTitle = Font.title.weight(.bold)
     static let sectionTitle = Font.title3.weight(.semibold)
     static let cardTitle = Font.headline.weight(.semibold)
-    static let metricValue = Font.title2.weight(.bold).monospacedDigit()
+    static let metricValue = Font.title.weight(.semibold).monospacedDigit()
     static let body = Font.body
     static let caption = Font.caption.weight(.medium)
+    static let eyebrow = Font.caption.weight(.semibold)
     static let monoValue = Font.body.monospacedDigit().weight(.semibold)
 }
 
@@ -70,8 +77,8 @@ enum BotaplataSpacing {
 enum BotaplataRadius {
     static let sm: CGFloat = 10
     static let md: CGFloat = 16
-    static let lg: CGFloat = 24
-    static let xl: CGFloat = 30
+    static let lg: CGFloat = 16
+    static let xl: CGFloat = 16
     static let pill: CGFloat = 999
 }
 
@@ -118,8 +125,9 @@ enum BotaplataTheme {
 
     static func applyTabBarAppearance() {
         let appearance = UITabBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.backgroundColor = UIColor(BotaplataColors.backgroundElevated.opacity(0.92))
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(BotaplataColors.surface)
+        appearance.shadowColor = UIColor(BotaplataColors.border)
         appearance.stackedLayoutAppearance.selected.iconColor = UIColor(BotaplataColors.primaryTeal)
         appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor(BotaplataColors.primaryTeal)]
         appearance.stackedLayoutAppearance.normal.iconColor = UIColor(BotaplataColors.textSecondary)
