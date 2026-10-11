@@ -30,6 +30,13 @@ final class JournalAlertsPresentationTests: XCTestCase {
         XCTAssertEqual(JournalEventPresentation.filtered(events, filter: .system, query: "").map(\.type), [.sessionStopped])
     }
 
+    func testErrorFilterIncludesExplicitErrorsAndCriticalEvents() {
+        let error = event(.error)
+        let signal = event(.decisionRecorded)
+        let critical = TimelineEvent(id: "critical", occurredAt: Date(), type: .monitoringDegraded, severity: .danger, title: "Backend alert", message: "Exact backend message", relatedOrderID: nil, relatedPositionID: nil, money: nil)
+        XCTAssertEqual(JournalEventPresentation.filtered([signal, error, critical], filter: .errors, query: "").map(\.id), [error.id, critical.id])
+    }
+
     func testAlertReadSeverityAndFilters() {
         let info = alert(id: "i", severity: .info, read: true, sessionID: nil)
         let warning = alert(id: "w", severity: .warning, read: false, sessionID: "s1")

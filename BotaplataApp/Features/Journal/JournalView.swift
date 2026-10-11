@@ -3,35 +3,122 @@ import SwiftUI
 import Charts
 #endif
 
-struct JournalContainerView: View { @State var historyStore: RealSessionHistoryStore; @State var sessionsStore: RealSessionsStore; @State private var selectedSessionID: String?
-    var sessions: [SessionSummary] { sessionsStore.visibleItems }
-    var selected: SessionSummary? { sessions.first { $0.id == selectedSessionID } ?? sessions.first { !$0.isHistorical } ?? sessions.first }
-    var body: some View { JournalView(session: selected, sessions: sessions, content: selected.map { historyStore.timelines[$0.id] ?? .idle } ?? .loaded([]), warnings: selected.map { historyStore.warnings[$0.id] ?? [] } ?? [], context: .global, select: { selectedSessionID = $0 }, loadNext: { if let id = selected?.id { await historyStore.loadNextTimeline(sessionID: id) } }, refresh: { await sessionsStore.refresh(); if let id = selected?.id { await historyStore.refreshTimeline(sessionID: id) } }).task { await historyStore.loadCache(); sessionsStore.start(); if let id = selected?.id { selectedSessionID = id; await historyStore.refreshTimeline(sessionID: id) } }.onChange(of: selected?.id) { _, id in if let id { selectedSessionID = id; Task { await historyStore.refreshTimeline(sessionID: id) } } } }
+struct JournalContainerView: View {
+    @State var historyStore: RealSessionHistoryStore
+    @State var sessionsStore: RealSessionsStore
+    @State private var selectedSessionID: String?
+    private var sessions: [SessionSummary] { sessionsStore.visibleItems }
+    private var selected: SessionSummary? { sessions.first { $0.id == selectedSessionID } ?? sessions.first { !$0.isHistorical } ?? sessions.first }
+    var body: some View {
+        JournalView(
+            session: selected, sessions: sessions,
+            content: selected.map { historyStore.timelines[$0.id] ?? .idle } ?? .loaded([]),
+            warnings: selected.map { historyStore.warnings[$0.id] ?? [] } ?? [],
+            select: { selectedSessionID = $0 },
+            loadNext: { if let id = selected?.id { await historyStore.loadNextTimeline(sessionID: id) } },
+            refresh: { await sessionsStore.refresh(); if let id = selected?.id { await historyStore.refreshTimeline(sessionID: id) } },
+            hasMore: selected.flatMap { historyStore.timelinePagination[$0.id]?.hasMore } ?? false
+        )
+        .task { await historyStore.loadCache(); sessionsStore.start() }
+        .task(id: selected?.id) { if let id = selected?.id { await historyStore.refreshTimeline(sessionID: id) } }
+        .navigationDestination(for: SessionRoute.self) { route in
+            switch route {
+            case let .detail(id, section):
+                SessionDetailContainerView(sessionID: id, initialSection: section, content: sessionsStore.details[id] ?? .idle, load: { await sessionsStore.loadDetail(id: id) }, historyStore: historyStore)
+            }
+        }
+    }
 }
 
 enum JournalEventCardContext { case global, session }
-enum JournalFilter: String, CaseIterable, Identifiable { case all, decisions, orders, positions, system; var id: String { rawValue }; var title: String { switch self { case .all: "Tous"; case .decisions: "Décisions"; case .orders: "Ordres"; case .positions: "Positions"; case .system: "Système" } } }
+enum JournalFilter: String, CaseIterable, Identifiable { case all, decisions, orders, positions, system, errors; var id: String { rawValue }; var title: String { switch self { case .all: "Tous"; case .decisions: "Signaux"; case .orders: "Ordres"; case .positions: "Positions"; case .system: "Système"; case .errors: "Erreurs" } } }
 
 struct JournalEventPresentation: Equatable { let title: String; let category: JournalFilter; let categoryLabel: String; let icon: String; let status: BadgeStatus; let severityText: String?
     static func make(from event: TimelineEvent) -> Self {
         let category: JournalFilter = switch event.type { case .cycleAnalyzed, .decisionRecorded: .decisions; case .buySubmitted, .buyPartiallyFilled, .buyFilled, .sellSubmitted, .sellPartiallyFilled, .sellFilled, .reconciliationPending, .reconciliationCompleted: .orders; case .positionOpened, .positionClosed: .positions; case .sessionStarted, .sessionStopped, .monitoringDegraded, .error, .unknown: .system }
         let title: String = switch event.type { case .sessionStarted: "Session démarrée"; case .cycleAnalyzed: "Cycle d’analyse"; case .decisionRecorded: "Décision enregistrée"; case .buySubmitted: "Ordre d'achat envoyé à Kraken"; case .buyPartiallyFilled: "Ordre d'achat partiellement exécuté"; case .buyFilled: "Achat confirmé par Kraken"; case .positionOpened: "Position ouverte"; case .sellSubmitted: "Ordre de vente envoyé à Kraken"; case .sellPartiallyFilled: "Ordre de vente partiellement exécuté"; case .sellFilled: "Vente confirmée par Kraken"; case .positionClosed: "Position fermée"; case .reconciliationPending: "Vérification de l'ordre nécessaire"; case .reconciliationCompleted: "Vérification terminée"; case .monitoringDegraded: "Surveillance perturbée"; case .sessionStopped: "Session arrêtée"; case .error: "Erreur de surveillance"; case .unknown: event.title }
-        let icon: String = switch category { case .decisions: "brain.head.profile"; case .orders: "arrow.up.arrow.down"; case .positions: "chart.line.uptrend.xyaxis"; case .system, .all: "server.rack" }
+        let icon: String = switch category { case .decisions: "brain.head.profile"; case .orders: "arrow.up.arrow.down"; case .positions: "chart.line.uptrend.xyaxis"; case .system, .all: "server.rack"; case .errors: "exclamationmark.triangle" }
         let status: BadgeStatus = switch event.severity { case .success: .success; case .warning: .warning; case .danger: .danger; case .neutral: .neutral; case .info: category == .system ? .neutral : .active }
         let severity = event.severity == .warning ? "Attention" : event.severity == .danger ? "Critique" : nil
         return .init(title: title, category: category, categoryLabel: category.title, icon: icon, status: status, severityText: severity)
     }
-    static func filtered(_ events: [TimelineEvent], filter: JournalFilter, query: String) -> [TimelineEvent] { events.filter { event in let p = make(from: event); let filterOK = filter == .all || p.category == filter; let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(); guard !q.isEmpty else { return filterOK }; return filterOK && [p.title, event.title, event.message, p.categoryLabel].joined(separator: " ").lowercased().contains(q) } }
+    static func filtered(_ events: [TimelineEvent], filter: JournalFilter, query: String) -> [TimelineEvent] { events.filter { event in let p = make(from: event); let filterOK = filter == .all || p.category == filter || (filter == .errors && (event.type == .error || event.severity == .danger)); let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(); guard !q.isEmpty else { return filterOK }; return filterOK && [p.title, event.title, event.message, p.categoryLabel].joined(separator: " ").lowercased().contains(q) } }
 }
 
 struct TimelineDateHeader: View { let title: String; var body: some View { Text(title).font(BotaplataTypography.sectionTitle).foregroundStyle(BotaplataColors.textPrimary).frame(maxWidth: .infinity, alignment: .leading).padding(.top, BotaplataSpacing.sm).accessibilityAddTraits(.isHeader) } }
 
-struct JournalView: View { let session: SessionSummary?; let sessions: [SessionSummary]; let content: LoadedContent<[TimelineEvent]>; var warnings: [Warning] = []; var context: JournalEventCardContext = .global; var select: (String) -> Void = { _ in }; var loadNext: () async -> Void = {}; var refresh: () async -> Void = {}; @State private var filter: JournalFilter = .all; @State private var searchText = ""
-    var body: some View { ZStack { PremiumBackground(); ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { header; if isOffline { PremiumOfflineBanner(); Text("Dernier état enregistré sur cet iPhone.").font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.textMuted) }; ForEach(warnings) { WarningBanner(warning: $0) }; contentView }.padding(BotaplataSpacing.md).safeAreaPadding(.bottom, BotaplataSpacing.xl) } .refreshable { await refresh() } }.navigationTitle("Journal") }
-    @ViewBuilder var header: some View { VStack(alignment: .leading, spacing: BotaplataSpacing.md) { HStack { Text("Journal").font(BotaplataTypography.largeTitle).foregroundStyle(BotaplataColors.textPrimary); Spacer(); if !sessions.isEmpty { Menu { ForEach(sessions) { s in Button("\(s.pair) · \(DashboardPresentation.wording(for: s.lifecycle).title)") { select(s.id) } } } label: { StatusPill(status: .active, text: session?.pair ?? "Session") } } }; ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(JournalFilter.allCases) { item in Button { filter = item } label: { FilterPill(title: item.title, isSelected: filter == item) }.buttonStyle(.plain).accessibilityLabel("Filtre Journal \(item.title)") } } }; PremiumSearchField(placeholder: "Rechercher dans les événements chargés", text: $searchText); Text("Recherche dans les événements chargés.").font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.textMuted) } }
-    @ViewBuilder var contentView: some View { switch content { case .idle, .loading: ForEach(0..<4, id: \.self) { _ in PremiumSkeletonCard() }; case .error: PremiumErrorState(title: "Impossible de charger le Journal", message: "Vérifiez la connexion au serveur Botaplata."); case .loaded(let e), .loadedFromCache(let e), .refreshing(let e?), .offline(let e?), .partial(let e), .stale(let e): timeline(e); case .refreshing(nil), .offline(nil): PremiumErrorState(title: "Impossible de charger le Journal", message: "Vérifiez la connexion au serveur Botaplata.") } }
-    @ViewBuilder func timeline(_ events: [TimelineEvent]) -> some View { let visible = JournalEventPresentation.filtered(events, filter: filter, query: searchText); if session == nil { PremiumEmptyState(title: "Aucune session à afficher", message: "Le Journal affichera l'activité de Botaplata lorsqu'une session Kraken réelle sera disponible.") } else if events.isEmpty { PremiumEmptyState(title: "Aucun événement", message: "Les décisions, ordres et événements techniques de Botaplata apparaîtront ici.") } else if visible.isEmpty { PremiumEmptyState(title: "Aucun événement dans ce filtre", message: "Essayez un autre filtre.") } else { ForEach(HistoryPresentation.group(visible), id: \.title) { group in TimelineDateHeader(title: group.title); ForEach(group.items) { event in JournalEventCard(event: event, session: session, context: context).task { if event.id == events.last?.id { await loadNext() } } } } } }
-    var isOffline: Bool { if case .offline = content { true } else { false } }
+struct JournalView: View {
+    let session: SessionSummary?
+    let sessions: [SessionSummary]
+    let content: LoadedContent<[TimelineEvent]>
+    var warnings: [Warning] = []
+    var context: JournalEventCardContext = .global
+    var select: (String) -> Void = { _ in }
+    var loadNext: () async -> Void = {}
+    var refresh: () async -> Void = {}
+    var hasMore = false
+    @State private var filter: JournalFilter = .all
+    @State private var searchText = ""
+    private var isOffline: Bool { if case .offline = content { true } else { false } }
+    var body: some View {
+        ZStack {
+            PremiumScreenBackground()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    header
+                    if isOffline { PremiumOfflineBanner() }
+                    ForEach(warnings) { WarningBanner(warning: $0) }
+                    contentView
+                    if hasMore { PremiumSecondaryButton(title: "Charger d’autres événements") { Task { await loadNext() } } }
+                }.padding(16).safeAreaPadding(.bottom, 16)
+            }.refreshable { await refresh() }
+        }.navigationTitle("Journal").navigationBarTitleDisplayMode(.inline)
+            .toolbar(context == .global ? .hidden : .visible, for: .navigationBar)
+    }
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Journal").font(BotaplataTypography.largeTitle).accessibilityAddTraits(.isHeader)
+            if !sessions.isEmpty {
+                Menu {
+                    ForEach(sessions) { item in Button("\(item.pair) · Session \(item.id) · \(SessionsPresentation.statusText(item))") { select(item.id) } }
+                } label: {
+                    HStack { Text("\(session?.pair ?? "Session") · \(session?.id ?? "")"); Image(systemName: "chevron.down") }.frame(minHeight: 44)
+                }.accessibilityLabel("Choisir la session du journal")
+            }
+            PremiumSegmentedControl(title: "Journal", options: [.all, .decisions, .system, .errors], selection: $filter, label: { $0.title })
+            Menu("Filtres détaillés") {
+                Button("Ordres") { filter = .orders }
+                Button("Positions") { filter = .positions }
+                Button("Tous les événements") { filter = .all }
+            }.font(.subheadline).frame(minHeight: 44)
+            if filter == .orders || filter == .positions { PremiumStatusBadge(status: .neutral, text: "Filtre : \(filter.title)") }
+            PremiumSearchField(placeholder: "Rechercher dans les événements chargés", text: $searchText)
+        }.foregroundStyle(BotaplataColors.textPrimary)
+    }
+    @ViewBuilder private var contentView: some View {
+        switch content {
+        case .idle, .loading, .refreshing(nil): PremiumLoadingSkeleton(); PremiumLoadingSkeleton()
+        case .error(let message): PremiumErrorState(title: "Journal indisponible", message: message)
+        case .offline(nil): PremiumEmptyState(title: "Journal hors ligne", message: "Aucun événement en cache.", systemImage: "wifi.slash")
+        case .loaded(let events), .loadedFromCache(let events), .refreshing(let events?), .offline(let events?), .partial(let events), .stale(let events): timeline(events)
+        }
+    }
+    @ViewBuilder private func timeline(_ events: [TimelineEvent]) -> some View {
+        let visible = JournalEventPresentation.filtered(events, filter: filter, query: searchText)
+        if session == nil { PremiumEmptyState(title: "Aucune session", message: "Choisissez une session réelle pour consulter ses événements.") }
+        else if events.isEmpty { PremiumEmptyState(title: "Aucun événement", message: "Aucun événement n’a été fourni pour cette session.") }
+        else if visible.isEmpty { PremiumEmptyState(title: "Aucun résultat dans les événements chargés", message: "Changez le filtre ou chargez la suite du journal.") }
+        else {
+            ForEach(HistoryPresentation.group(visible), id: \.title) { group in
+                TimelineDateHeader(title: group.title)
+                PremiumCard {
+                    ForEach(group.items.sorted { $0.occurredAt > $1.occurredAt }) { event in
+                        JournalEventCard(event: event, session: session, context: context)
+                    }
+                }
+            }
+        }
+    }
 }
 
 struct JournalEventCard: View {
@@ -42,43 +129,64 @@ struct JournalEventCard: View {
     private var presentation: JournalEventPresentation { .make(from: event) }
     var body: some View {
         Button { expanded.toggle() } label: {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(spacing: 8) {
-                    Image(systemName: presentation.icon).font(.subheadline)
-                        .foregroundStyle(presentation.status.color)
-                        .frame(width: 32, height: 32)
-                        .background(presentation.status.color.opacity(0.12), in: Circle())
-                    Rectangle().fill(BotaplataColors.separator).frame(width: 1, height: 30)
-                }.accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(HistoryPresentation.time(event.occurredAt)).font(.caption.monospacedDigit()).foregroundStyle(BotaplataColors.textMuted)
-                    Text(presentation.title).font(.headline)
-                    Text(event.message).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary)
-                    if let severity = presentation.severityText { Text(severity).font(.caption.bold()).foregroundStyle(presentation.status.color) }
-                    if context == .global, let session { Text(session.pair).font(.caption).foregroundStyle(BotaplataColors.textMuted) }
-                    if expanded {
-                        Text(HistoryPresentation.fullDate(event.occurredAt)).font(.caption)
-                        if let id = event.relatedOrderID { Text("Ordre · " + String(id.suffix(8))).font(.caption.monospaced()) }
-                    }
+            PremiumTimelineRow(symbol: presentation.icon, color: presentation.status.color, date: event.occurredAt) {
+                Text(event.title).font(.headline)
+                Text(event.message).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary)
+                if let severity = presentation.severityText { Text(severity).font(.caption.weight(.semibold)).foregroundStyle(presentation.status.color) }
+                if expanded {
+                    if event.title != presentation.title { Text("Repère pédagogique : \(presentation.title)").font(.caption).foregroundStyle(BotaplataColors.textSecondary) }
+                    if context == .global, let session { Text("Session \(session.id) · \(session.pair)").font(.caption) }
+                    if let id = event.relatedOrderID { Text("Ordre · " + String(id.suffix(8))).font(.caption.monospaced()) }
                 }
-                Spacer(minLength: 0)
-                Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(BotaplataColors.textMuted)
-            }
-            .foregroundStyle(BotaplataColors.textPrimary)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(presentation.title). \(event.message). \(HistoryPresentation.fullDate(event.occurredAt))")
-        .accessibilityHint(expanded ? "Masquer le détail" : "Afficher le détail")
+                Label(expanded ? "Masquer" : "Détails", systemImage: expanded ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(BotaplataColors.accent)
+            }.foregroundStyle(BotaplataColors.textPrimary).padding(.vertical, 8).frame(minHeight: 44)
+        }.buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(event.title). \(event.message). \(HistoryPresentation.fullDate(event.occurredAt))")
+            .accessibilityHint(expanded ? "Masquer le détail" : "Afficher le détail")
     }
 }
+
 struct EventMetadataRow: View { let title: String; let value: String; var body: some View { HStack { Text(title).foregroundStyle(BotaplataColors.textMuted); Spacer(); Text(value).foregroundStyle(BotaplataColors.textSecondary).monospacedDigit() }.font(.caption) } }
 
-struct OrdersHistoryView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { PagedHistoryList(title: "Ordres", content: store.orders[session.id] ?? .idle, emptyTitle: "Aucun ordre", emptyMessage: "Aucun ordre n'est disponible pour cette session.", loadNext: { await store.loadNextOrders(sessionID: session.id) }, row: { OrderRow(order: $0) }).task { await store.refreshOrders(sessionID: session.id) }.refreshable { await store.refreshOrders(sessionID: session.id) } } }
+struct OrdersHistoryView: View {
+    let session: SessionDetail
+    let store: RealSessionHistoryStore
+    var body: some View {
+        OrdersView(content: store.orders[session.id] ?? .idle, hasMore: store.ordersPagination[session.id]?.hasMore ?? false, loadNext: { await store.loadNextOrders(sessionID: session.id) })
+            .task(id: session.id) { await store.refreshOrders(sessionID: session.id) }
+            .refreshable { await store.refreshOrders(sessionID: session.id) }
+    }
+}
+
+struct OrdersView: View {
+    let content: LoadedContent<[SessionOrder]>
+    var hasMore = false
+    var loadNext: () async -> Void = {}
+    @State private var filter: PremiumOrderFilter = .all
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                PremiumSectionHeader(title: "Ordres", subtitle: "Exécutions et statuts reçus du backend")
+                PremiumSegmentedControl(title: "Ordres", options: PremiumOrderFilter.allCases, selection: $filter, label: { $0.title })
+                switch content {
+                case .idle, .loading, .refreshing(nil): PremiumLoadingSkeleton(); PremiumLoadingSkeleton()
+                case .error(let message): PremiumErrorState(title: "Ordres indisponibles", message: message)
+                case .offline(nil): PremiumEmptyState(title: "Ordres hors ligne", message: "Aucun ordre en cache.", systemImage: "wifi.slash")
+                case .loaded(let orders), .loadedFromCache(let orders), .refreshing(let orders?), .offline(let orders?), .stale(let orders), .partial(let orders):
+                    if case .offline = content { PremiumOfflineBanner() }
+                    let visible = orders.filter { filter.includes($0) }
+                    if visible.isEmpty { PremiumEmptyState(title: "Aucun ordre dans ce filtre", message: "Filtre appliqué aux ordres chargés. Les pages suivantes peuvent contenir d’autres ordres.") }
+                    ForEach(visible) { OrderRow(order: $0) }
+                }
+                if hasMore { PremiumSecondaryButton(title: "Charger d’autres ordres") { Task { await loadNext() } } }
+            }.padding(16).safeAreaPadding(.bottom, 16)
+        }
+    }
+}
+
 struct DecisionsHistoryView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { PagedHistoryList(title: "Décisions", content: store.decisions[session.id] ?? .idle, emptyTitle: "Aucune décision", emptyMessage: "Aucune décision n'est disponible pour cette session.", loadNext: { await store.loadNextDecisions(sessionID: session.id) }, row: { DecisionRow(decision: $0) }).task { await store.refreshDecisions(sessionID: session.id) }.refreshable { await store.refreshDecisions(sessionID: session.id) } } }
-struct SessionJournalHistoryView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { JournalView(session: SessionSummary(id: session.id, pair: session.pair, provider: session.provider, providerLabel: session.providerLabel, backendStatus: session.backendStatus, lifecycle: session.lifecycle, runtimeHealth: session.runtimeHealth, freshness: session.freshness, executionMode: session.executionMode), sessions: [], content: store.timelines[session.id] ?? .idle, warnings: store.warnings[session.id] ?? [], context: .session, loadNext: { await store.loadNextTimeline(sessionID: session.id) }, refresh: { await store.refreshTimeline(sessionID: session.id) }).task { await store.refreshTimeline(sessionID: session.id) } } }
+struct SessionJournalHistoryView: View { let session: SessionDetail; let store: RealSessionHistoryStore; var body: some View { JournalView(session: SessionSummary(id: session.id, pair: session.pair, provider: session.provider, providerLabel: session.providerLabel, backendStatus: session.backendStatus, lifecycle: session.lifecycle, runtimeHealth: session.runtimeHealth, freshness: session.freshness, executionMode: session.executionMode), sessions: [], content: store.timelines[session.id] ?? .idle, warnings: store.warnings[session.id] ?? [], context: .session, loadNext: { await store.loadNextTimeline(sessionID: session.id) }, refresh: { await store.refreshTimeline(sessionID: session.id) }, hasMore: store.timelinePagination[session.id]?.hasMore ?? false).task { await store.refreshTimeline(sessionID: session.id) } } }
 
 struct PagedHistoryList<Item: Identifiable & Sendable, Row: View>: View { let title: String; let content: LoadedContent<[Item]>; let emptyTitle: String; let emptyMessage: String; let loadNext: () async -> Void; let row: (Item) -> Row; var body: some View { ScrollView { LazyVStack(alignment: .leading, spacing: BotaplataSpacing.md) { Text(title).font(BotaplataTypography.sectionTitle).accessibilityAddTraits(.isHeader); switch content { case .idle, .loading: ForEach(0..<3, id: \.self) { _ in PremiumSkeletonCard() }; case .error: PremiumErrorState(title: "Chargement impossible", message: "Vérifiez votre connexion puis réessayez."); case .loaded(let items), .loadedFromCache(let items), .refreshing(let items?), .offline(let items?), .partial(let items), .stale(let items): if items.isEmpty { PremiumEmptyState(title: emptyTitle, message: emptyMessage) } else { ForEach(items) { item in row(item).task { if item.id == items.last?.id { await loadNext() } } }; if case .refreshing = content { ProgressView().frame(maxWidth: .infinity) } }; case .refreshing(nil), .offline(nil): PremiumErrorState(title: "Chargement impossible", message: "Vérifiez votre connexion puis réessayez.") } }.padding().safeAreaPadding(.bottom, BotaplataSpacing.xl) } } }
 struct OrderRow: View {
@@ -87,23 +195,24 @@ struct OrderRow: View {
         PremiumCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label(order.side.label, systemImage: order.side == .buy ? "arrow.down.left" : "arrow.up.right").font(.headline)
+                    Image(systemName: order.side == .buy ? "arrow.down.left" : order.side == .sell ? "arrow.up.right" : "questionmark").font(.headline).foregroundStyle(order.side == .unknown ? BotaplataColors.textSecondary : BotaplataColors.accent).frame(width: 40, height: 40).background(BotaplataColors.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 3) { Text(order.side.label).font(.headline); Text(order.symbol).font(.caption).foregroundStyle(BotaplataColors.textSecondary) }
                     Spacer()
                     Text(order.provider.displayName).font(.caption).foregroundStyle(BotaplataColors.textSecondary)
                 }
-                StatusPill(status: order.status == .filled ? .success : order.status == .rejected ? .danger : .waiting,
+                StatusPill(status: order.status.premiumBadge,
                            text: order.status == .open ? "Ouvert · état local" : order.statusLabel ?? order.status.label)
                 Text((order.filledAt ?? order.updatedAt ?? order.createdAt).map(HistoryPresentation.fullDate) ?? "Horodatage non fourni")
                     .font(.caption).foregroundStyle(BotaplataColors.textSecondary)
                 row("Quantité exécutée", order.executedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible")
                 row("Prix moyen exécuté", FinancialFormatters.money(order.averageFillPrice))
+                row("Montant exécuté", FinancialFormatters.money(order.executedQuoteAmount))
                 row("Frais constatés", FinancialFormatters.money(order.feesQuote))
-                row("P&L net réalisé", FinancialFormatters.money(order.realizedPnLNetQuote))
+                PremiumKeyValueRow(label: "P&L net réalisé", value: FinancialFormatters.money(order.realizedPnLNetQuote), valueColor: PremiumValueTone.pnl(order.realizedPnLNetQuote).color, monospaced: true)
                 DisclosureGroup("Détails de l’ordre") {
                     row("Type", order.orderType?.uppercased() ?? "Indisponible")
                     row("Quantité demandée", order.requestedQuantity.map { FinancialFormatters.decimal($0, min: 2, max: 8) } ?? "Indisponible")
                     row("Prix limite", FinancialFormatters.money(order.limitPrice))
-                    row("Montant exécuté", FinancialFormatters.money(order.executedQuoteAmount))
                     row("Réconciliation", order.reconciliationState ?? "Non fournie")
                     Text("Statut reçu du backend ; un état local ouvert ne certifie pas que l’ordre est encore ouvert chez Kraken.").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
                 }
@@ -186,3 +295,15 @@ enum HistoryPresentation { static func icon(_ e: TimelineEvent) -> String { Jour
 #Preview("Transactions") { NavigationStack { PagedHistoryList(title: "Transactions", content: .loaded(PreviewFixtures.sessionOrders), emptyTitle: "Aucun ordre", emptyMessage: "", loadNext: {}, row: { OrderRow(order: $0) }) } }
 #Preview("Décisions historiques") { NavigationStack { PagedHistoryList(title: "Décisions", content: .loaded(PreviewFixtures.sessionDecisions), emptyTitle: "Aucune décision", emptyMessage: "", loadNext: {}, row: { DecisionRow(decision: $0) }) } }
 #Preview("Graphique sans série") { NavigationStack { SessionHistoryChartContent(chart: PreviewFixtures.sessionChart) } }
+
+private extension OrderStatus {
+    var premiumBadge: BadgeStatus {
+        switch self {
+        case .filled: .success
+        case .rejected, .reconciliationBlocked, .reconciliationFailed: .danger
+        case .partiallyFilled, .reconciliationRequired: .warning
+        case .submissionStarted, .submitted, .open: .waiting
+        case .canceled, .unknown: .neutral
+        }
+    }
+}

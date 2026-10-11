@@ -17,6 +17,11 @@ sources=(
     Domain/Trading/TradingModels.swift
     Domain/Trading/TradingChartModels.swift
     Domain/Trading/PremiumMarketPresentation.swift
+    Domain/Trading/MidnightPresentation.swift
+    Core/DesignSystem/Tokens/MidnightPalette.swift
+    Domain/Shared/AppTab.swift
+    Domain/Sessions/RealSessionHistoryModels.swift
+    Domain/Sessions/RealSessionsMapper.swift
     Domain/Shared/SharedModels.swift
     Domain/Shared/APIWarningPresentation.swift
     Domain/Sessions/SessionModels.swift
@@ -29,6 +34,8 @@ sources=(
     Domain/Sessions/StrategyExplanationModels.swift
     Domain/Sessions/StrategyExplanationMapper.swift
     Domain/Dashboard/RealActiveSnapshotDTO.swift
+    Domain/Dashboard/RealActiveSnapshot.swift
+    Domain/Dashboard/DashboardSnapshotMapper.swift
     Core/Formatting/FinancialFormatters.swift
     Core/Networking/APIEnvelope.swift
     Core/Networking/APIWarning.swift
@@ -36,6 +43,9 @@ sources=(
     Core/Networking/APIError.swift
     Core/Networking/JSONCoding.swift
 )
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    sources+=(Core/Logging/BotaplataLog.swift)
+fi
 for source_file in "${sources[@]}"; do
     cp "$repo_root/BotaplataApp/$source_file" "$validation_root/Sources/BotaplataApp/"
 done
@@ -43,6 +53,7 @@ cp "$repo_root/BotaplataAppTests/TradingChartMapperTests.swift" "$validation_roo
 cp "$repo_root/BotaplataAppTests/MobileV1ChartContractDecodingTests.swift" "$validation_root/Tests/BotaplataAppTests/"
 cp "$repo_root/BotaplataAppTests/PremiumStrategyStoreTests.swift" "$validation_root/Tests/BotaplataAppTests/"
 cp "$repo_root/BotaplataAppTests/PremiumRedesignTests.swift" "$validation_root/Tests/BotaplataAppTests/"
+cp "$repo_root/BotaplataAppTests/MidnightPresentationTests.swift" "$validation_root/Tests/BotaplataAppTests/"
 cp -R "$repo_root/BotaplataAppTests/Fixtures" "$validation_root/Tests/BotaplataAppTests/"
 export CLANG_MODULE_CACHE_PATH="$validation_root/clang-cache"
 swift test --cache-path "$validation_root/swift-cache" --config-path "$validation_root/swift-config" --security-path "$validation_root/swift-security" --package-path "$validation_root" --jobs 2

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct PremiumBackground: View {
+struct PremiumScreenBackground: View {
     var body: some View {
         BotaplataColors.background
         .ignoresSafeArea()
@@ -8,7 +8,9 @@ struct PremiumBackground: View {
     }
 }
 
-enum PremiumCardVariant {
+typealias PremiumBackground = PremiumScreenBackground
+
+enum PremiumCardVariant: Equatable {
     case normal, elevated, success, warning, danger, hero
     var border: Color {
         switch self {
@@ -31,7 +33,7 @@ struct PremiumCard<Content: View>: View {
             .foregroundStyle(BotaplataColors.textPrimary)
             .padding(BotaplataSpacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(BotaplataColors.card, in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous))
+            .background(variant == .elevated ? BotaplataColors.elevated : BotaplataColors.surface, in: RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: BotaplataRadius.md, style: .continuous)
                     .stroke(variant.border, lineWidth: 1)
@@ -45,13 +47,14 @@ struct BotaplataCard<Content: View>: View { @ViewBuilder var content: Content; v
 struct MetricCard: View {
     let title: String; let value: String; let footnote: String?; let variant: PremiumCardVariant
     init(title: String, value: String, footnote: String? = nil, variant: PremiumCardVariant = .normal) { self.title = title; self.value = value; self.footnote = footnote; self.variant = variant }
-    var body: some View { PremiumCard(variant: variant) { VStack(alignment: .leading, spacing: BotaplataSpacing.xs) { Text(title).font(BotaplataTypography.caption).foregroundStyle(BotaplataColors.textSecondary); Text(value).font(BotaplataTypography.metricValue).foregroundStyle(BotaplataColors.textPrimary).minimumScaleFactor(0.75); if let footnote { Text(footnote).font(.caption).foregroundStyle(BotaplataColors.textMuted) } } }.accessibilityElement(children: .combine) }
+    var body: some View { PremiumMetricCard(title: title, value: value, footnote: footnote, tone: variant == .success ? .positive : variant == .danger ? .negative : .neutral) }
 }
 
 enum BadgeStatus { case active, waiting, success, warning, danger, neutral; var color: Color { switch self { case .active: BotaplataColors.primaryTeal; case .waiting: BotaplataColors.accentCyan; case .success: BotaplataColors.success; case .warning: BotaplataColors.warning; case .danger: BotaplataColors.danger; case .neutral: BotaplataColors.neutral } }; var icon: String { switch self { case .active: "dot.radiowaves.left.and.right"; case .waiting: "clock"; case .success: BotaplataSymbol.success; case .warning: BotaplataSymbol.warning; case .danger: BotaplataSymbol.critical; case .neutral: "circle" } } }
 struct StatusPill: View { let status: BadgeStatus; let text: String; var accessibilityText: String? = nil; var body: some View { Label(text, systemImage: status.icon).font(.caption.weight(.semibold)).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 11).padding(.vertical, 7).foregroundStyle(status.color).background(status.color.opacity(0.16), in: Capsule()).overlay(Capsule().stroke(status.color.opacity(0.34), lineWidth: 1)).accessibilityElement(children: .ignore).accessibilityLabel(accessibilityText ?? text) } }
 struct StatusBadge: View { let status: BadgeStatus; let text: String; var body: some View { StatusPill(status: status, text: text) } }
-struct FilterPill: View { let title: String; var isSelected: Bool; var body: some View { Text(title).font(.caption.weight(.semibold)).padding(.horizontal, 14).padding(.vertical, 8).foregroundStyle(isSelected ? BotaplataColors.backgroundDeep : BotaplataColors.textSecondary).background(isSelected ? AnyShapeStyle(BotaplataGradients.buttonPrimary) : AnyShapeStyle(BotaplataColors.cardGlass), in: Capsule()).overlay(Capsule().stroke(BotaplataColors.cardBorder, lineWidth: 1)).accessibilityAddTraits(isSelected ? .isSelected : []) } }
+typealias FilterPill = PremiumFilterChip
+
 struct LiveBadge: View { var body: some View { StatusPill(status: .active, text: "LIVE", accessibilityText: "LIVE, session en cours") } }
 enum SeverityLevel { case attention, critical, success; var status: BadgeStatus { self == .critical ? .danger : self == .success ? .success : .warning }; var text: String { self == .critical ? "Critique" : self == .success ? "En cours" : "Attention" }; var accessibility: String { self == .critical ? "Critique, protection déclenchée" : self == .success ? "En cours, état opérationnel" : "Attention, surveillance perturbée" } }
 struct SeverityBadge: View { let level: SeverityLevel; var body: some View { StatusPill(status: level.status, text: level.text, accessibilityText: level.accessibility) } }
@@ -78,8 +81,12 @@ struct ErrorStateView: View { let title: String; let message: String; var body: 
 struct PremiumErrorState: View { let title: String; let message: String; var body: some View { PremiumCard(variant: .danger) { Label(title, systemImage: BotaplataSymbol.critical).font(BotaplataTypography.cardTitle); Text(message).foregroundStyle(BotaplataColors.textSecondary) }.accessibilityElement(children: .combine) } }
 struct LoadingStateView: View { let title: String; let message: String; var body: some View { PremiumLoadingState(title: title, message: message) } }
 struct PremiumLoadingState: View { let title: String; let message: String; var body: some View { PremiumCard { HStack(spacing: BotaplataSpacing.md) { ProgressView().tint(BotaplataColors.primaryMint); VStack(alignment: .leading, spacing: 4) { Text(title).font(BotaplataTypography.cardTitle); Text(message).foregroundStyle(BotaplataColors.textSecondary) } } }.accessibilityElement(children: .combine) } }
-struct PremiumSkeletonCard: View { @Environment(\.accessibilityReduceMotion) private var reduceMotion; @State private var highlighted = false; var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Capsule().fill(BotaplataColors.cardBorder).frame(width: 140, height: 14); Capsule().fill(BotaplataColors.cardBorder.opacity(0.7)).frame(height: 24); Capsule().fill(BotaplataColors.cardBorder.opacity(0.55)).frame(width: 220, height: 12) }.opacity(highlighted ? 0.55 : 1) }.onAppear { guard !reduceMotion else { return }; withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { highlighted = true } }.accessibilityLabel("Données en préparation") } }
-struct SectionHeader: View { let title: String; let subtitle: String?; var body: some View { VStack(alignment: .leading, spacing: 3) { Text(title).font(BotaplataTypography.sectionTitle).foregroundStyle(BotaplataColors.textPrimary); if let subtitle { Text(subtitle).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary) } }.frame(maxWidth: .infinity, alignment: .leading) } }
+struct PremiumLoadingSkeleton: View { @Environment(\.accessibilityReduceMotion) private var reduceMotion; @State private var highlighted = false; var body: some View { PremiumCard { VStack(alignment: .leading, spacing: BotaplataSpacing.sm) { Capsule().fill(BotaplataColors.cardBorder).frame(width: 140, height: 14); Capsule().fill(BotaplataColors.cardBorder.opacity(0.7)).frame(height: 24); Capsule().fill(BotaplataColors.cardBorder.opacity(0.55)).frame(width: 220, height: 12) }.opacity(highlighted ? 0.55 : 1) }.onAppear { guard !reduceMotion else { return }; withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { highlighted = true } }.accessibilityLabel("Données en préparation") } }
+typealias PremiumSkeletonCard = PremiumLoadingSkeleton
+struct PremiumSectionHeader: View { let title: String; let subtitle: String?; var body: some View { VStack(alignment: .leading, spacing: 3) { Text(title).font(BotaplataTypography.sectionTitle).foregroundStyle(BotaplataColors.textPrimary); if let subtitle { Text(subtitle).font(.subheadline).foregroundStyle(BotaplataColors.textSecondary) } }.frame(maxWidth: .infinity, alignment: .leading) } }
+
+typealias SectionHeader = PremiumSectionHeader
+typealias PremiumStatusBadge = StatusPill
 
 struct PremiumKeyValueRow: View {
     let label: String

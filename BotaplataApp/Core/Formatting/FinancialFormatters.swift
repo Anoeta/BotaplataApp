@@ -14,3 +14,5 @@ enum FinancialFormatters {
         return formatter.string(from: value as NSDecimalNumber) ?? "—"
     }
 }
+
+extension Optional where Wrapped == DecimalString { func money(_ currency: String) -> MoneyAmount? { guard let self else { return nil }; return MoneyAmount(self.value, currency: currency) } }

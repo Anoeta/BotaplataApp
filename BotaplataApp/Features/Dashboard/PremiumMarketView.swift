@@ -9,13 +9,10 @@ struct PremiumMarketSection: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        PremiumCard {
+        PremiumChartContainer(title: session.pair, subtitle: "Marché · OHLC persisté") {
             VStack(alignment: .leading, spacing: BotaplataSpacing.sm) {
-                HStack {
-                    Label(session.pair, systemImage: "chart.xyaxis.line").font(.headline)
-                    Spacer()
-                    Text(session.priceObservedAt.map { "Cours · " + HistoryPresentation.time($0) } ?? "Cours · date inconnue").font(.caption).foregroundStyle(BotaplataColors.textMuted)
-                }
+                Text(session.priceObservedAt.map { "Cours observé · " + HistoryPresentation.fullDate($0) } ?? "Cours · date inconnue")
+                    .font(.caption).foregroundStyle(BotaplataColors.textSecondary)
                 ChartRangeSelector(selected: store.selectedRange) { store.selectRange($0, sessionID: session.id) }
                 content
             }
@@ -47,7 +44,7 @@ struct PremiumMarketSection: View {
             if chart.sessionID == session.id && chart.displaySymbol.replacingOccurrences(of: "/", with: "").uppercased() == session.pair.replacingOccurrences(of: "/", with: "").uppercased() {
                 if case .offline = store.state { Label("Historique en cache · hors ligne", systemImage: "wifi.slash").font(.caption).foregroundStyle(BotaplataColors.warning) }
                 if case .refreshing = store.state { ProgressView("Actualisation…").font(.caption) }
-                PremiumPriceChart(chart: chart, currentPrice: session.currentPrice)
+                PremiumCandlestickPanel(chart: chart, currentPrice: session.currentPrice)
                 ForEach(chart.warnings) { warning in Text(warning.message).font(.caption).foregroundStyle(BotaplataColors.warning) }
             } else {
                 Text("Le graphique reçu ne correspond pas à cette session ou à ce marché.").font(.caption).foregroundStyle(BotaplataColors.warning)
@@ -91,7 +88,7 @@ struct PremiumPriceChart: View {
 
     private var priceHeader: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(selected.map { FinancialFormatters.money(MoneyAmount(Decimal($0.price), currency: chart.quoteAsset)) } ?? (currentPrice?.value == nil ? "Cours indisponible" : FinancialFormatters.money(currentPrice)))
+            Text(selected.flatMap { point in chart.candles.first { $0.id == point.id }.map { FinancialFormatters.money(MoneyAmount($0.close, currency: chart.quoteAsset)) } } ?? (currentPrice?.value == nil ? "Cours indisponible" : FinancialFormatters.money(currentPrice)))
                 .font(.largeTitle.bold().monospacedDigit())
                 .contentTransition(.identity)
             if let selected {

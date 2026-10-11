@@ -25,9 +25,10 @@ struct RootView: View {
         Group {
             switch appState.sessionState {
             case .authenticated, .offlineWithCachedSession, .refreshing:
-                TabView(selection: $router.selectedTab) {
+                PremiumBottomNavigation(selection: $router.selectedTab) {
                     NavigationStack(path: $router.dashboardPath) { DashboardContainerView(store: activeSessionStore, pushStore: pushStore) }.tabItem { Label(AppTab.dashboard.title, systemImage: AppTab.dashboard.symbol) }.tag(AppTab.dashboard)
                     NavigationStack(path: $router.sessionsPath) { SessionsContainerView(store: realSessionsStore) }.tabItem { Label(AppTab.sessions.title, systemImage: AppTab.sessions.symbol) }.tag(AppTab.sessions)
+                    NavigationStack(path: $router.analysisPath) { AnalysisContainerView(store: realSessionsStore) }.tabItem { Label(AppTab.analysis.title, systemImage: AppTab.analysis.symbol) }.tag(AppTab.analysis)
                     NavigationStack(path: $router.journalPath) { JournalContainerView(historyStore: realSessionHistoryStore, sessionsStore: realSessionsStore) }.tabItem { Label(AppTab.journal.title, systemImage: AppTab.journal.symbol) }.tag(AppTab.journal)
                     NavigationStack(path: $router.profilePath) { ProfileContainerView(store: profileStore, pushStore: pushStore) }.tabItem { Label(AppTab.profile.title, systemImage: AppTab.profile.symbol) }.tag(AppTab.profile)
                 }

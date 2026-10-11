@@ -6,10 +6,12 @@ struct DashboardView: View {
     var openAlerts: () -> Void = {}
     var openSession: (String) -> Void = { _ in }
     var refresh: (() async -> Void)? = nil
+    var historyStore: RealSessionHistoryStore? = nil
+    var openAnalysis: (String) -> Void = { _ in }
     @Environment(RealStrategyExplanationStore.self) private var strategyStore
 
-    init(content: LoadedContent<RealActiveSnapshot>, unreadCount: Int = 0, openAlerts: @escaping () -> Void = {}, openSession: @escaping (String) -> Void = { _ in }, refresh: (() async -> Void)? = nil) {
-        self.content = content; self.unreadCount = unreadCount; self.openAlerts = openAlerts; self.openSession = openSession; self.refresh = refresh
+    init(content: LoadedContent<RealActiveSnapshot>, unreadCount: Int = 0, openAlerts: @escaping () -> Void = {}, openSession: @escaping (String) -> Void = { _ in }, refresh: (() async -> Void)? = nil, historyStore: RealSessionHistoryStore? = nil, openAnalysis: @escaping (String) -> Void = { _ in }) {
+        self.content = content; self.unreadCount = unreadCount; self.openAlerts = openAlerts; self.openSession = openSession; self.refresh = refresh; self.historyStore = historyStore; self.openAnalysis = openAnalysis
     }
 
     init(summary: DashboardSummary) {
@@ -36,13 +38,15 @@ struct DashboardView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Botaplata").font(.title.bold()).accessibilityAddTraits(.isHeader)
-                Text("Supervision · lecture seule").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
+                Text("Botaplata").font(BotaplataTypography.largeTitle).accessibilityAddTraits(.isHeader)
+                Text("SUPERVISION · LECTURE SEULE").tracking(1).font(BotaplataTypography.eyebrow).foregroundStyle(BotaplataColors.textSecondary)
             }
             Spacer()
             Button(action: openAlerts) {
                 Image(systemName: unreadCount > 0 ? "bell.badge" : "bell")
                     .font(.title3).frame(width: 44, height: 44)
+                    .background(BotaplataColors.surface, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(BotaplataColors.border, lineWidth: 1))
             }
             .accessibilityLabel(unreadCount > 0 ? "Alertes, \(unreadCount) non lues" : "Alertes")
         }
@@ -54,7 +58,7 @@ struct DashboardView: View {
         case .idle, .loading:
             PremiumSkeletonCard(); PremiumSkeletonCard(); PremiumSkeletonCard()
         case .error(let message):
-            PremiumErrorState(title: "Dashboard indisponible", message: message)
+            PremiumErrorState(title: "Accueil indisponible", message: message)
             retry
         case .loaded(let snapshot), .partial(let snapshot):
             snapshotView(snapshot, cached: false, offline: false)
@@ -77,14 +81,18 @@ struct DashboardView: View {
     @ViewBuilder private func snapshotView(_ snapshot: RealActiveSnapshot, cached: Bool, offline: Bool) -> some View {
         if let session = snapshot.activeSession {
             SupervisionStrip(session: session, cached: cached, offline: offline)
+            PremiumEngineCard(session: session, cached: cached)
+            PremiumSessionMetricsGrid(session: session)
             PremiumMarketSection(session: session)
             decision(session: session, cached: cached)
-            PremiumSessionPerformanceCard(session: session)
+            if let historyStore { PremiumRecentEventsSection(sessionID: session.id, store: historyStore) }
+            PremiumPerformanceUnavailableCard()
+            DisclosureGroup("Capital et détails financiers") { PremiumSessionPerformanceCard(session: session).padding(.top, 10) }.font(.subheadline.weight(.semibold))
             Button { openSession(session.id) } label: {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Session suivie · \(session.pair)").font(.headline)
-                        Text([session.provider.displayName, session.strategyName].compactMap { $0 }.joined(separator: " · "))
+                        Text([session.provider.displayName, SessionArchivePresentation.strategy(name: session.strategyName, version: session.strategyVersion)].compactMap { $0 }.joined(separator: " · "))
                             .font(.caption).foregroundStyle(BotaplataColors.textSecondary)
                     }
                     Spacer()
@@ -98,7 +106,7 @@ struct DashboardView: View {
             if let order = session.activeOrder { ActiveOrderCard(order: order) }
             ForEach(snapshot.warnings + session.warnings) { WarningBanner(warning: $0) }
             Text("Snapshot généré : \(snapshot.generatedAt.map(HistoryPresentation.fullDate) ?? "date inconnue")")
-                .font(.caption2).foregroundStyle(BotaplataColors.textMuted)
+                .font(.caption).foregroundStyle(BotaplataColors.textMuted)
         } else {
             if offline { PremiumOfflineBanner() }
             PremiumEmptyState(title: "Aucune session active", message: "Le backend ne signale aucune session Kraken réelle à suivre. Le graphique apparaît lorsqu’une session fournit ses bougies persistées.", systemImage: "chart.xyaxis.line")
@@ -114,7 +122,7 @@ struct DashboardView: View {
                 HStack {
                     Text("Dernière décision").font(.caption).foregroundStyle(BotaplataColors.textSecondary)
                     Spacer()
-                    Button("Analyse") { openSession(session.id) }.font(.subheadline.bold()).frame(minHeight: 44)
+                    Button("Analyse") { openAnalysis(session.id) }.font(.subheadline.bold()).frame(minHeight: 44)
                 }
                 if let explanation = strategyStore.explanation, explanation.sessionID == session.id {
                     Text(explanation.decision.label).font(.title3.bold())
@@ -166,7 +174,7 @@ extension DashboardPresentation {
     static func primaryBadgeText(_ session: SessionDetail) -> String { if session.runtimeHealth == .degraded { return "À surveiller" }; switch session.freshness.status { case .fresh: return decisionBadgeText(session.lifecycle); case .aging: return "Actualisation ralentie"; case .stale: return "Données anciennes"; case .cached: return "Dernier état connu"; case .unknown: return "Fraîcheur inconnue" } }
     static func decisionBadgeStatus(_ lifecycle: SessionLifecycleState) -> BadgeStatus { switch lifecycle { case .waitingBuy, .preparingBuy: return .waiting; case .waitingSell, .positionOpen, .monitoringPosition: return .success; case .waitingBuyFill, .waitingSellFill, .reconciliationPending: return .warning; default: return .neutral } }
     static func decisionBadgeText(_ lifecycle: SessionLifecycleState) -> String { switch lifecycle { case .waitingBuy: return "Recherche une opportunité"; case .preparingBuy: return "Préparation achat"; case .waitingBuyFill: return "Achat en attente"; case .waitingSell, .positionOpen, .monitoringPosition: return "Position ouverte"; case .waitingSellFill: return "Vente en attente"; case .reconciliationPending: return "Vérification en cours"; default: return wording(for: lifecycle).title } }
-    static func orderStatusText(_ status: OrderStatus) -> String { switch status { case .submissionStarted: return "Préparation de l’ordre"; case .submitted: return "Envoyé à Kraken"; case .open: return "En attente sur Kraken"; case .partiallyFilled: return "Exécution partielle"; case .reconciliationRequired: return "Vérification en cours"; case .reconciliationBlocked: return "Vérification nécessaire"; case .rejected: return "Ordre refusé"; case .filled: return "Confirmé par Kraken"; case .canceled: return "Annulé"; case .reconciliationFailed: return "Vérification échouée"; case .unknown: return "État inconnu" } }
+    static func orderStatusText(_ status: OrderStatus) -> String { switch status { case .submissionStarted: return "Préparation de l’ordre"; case .submitted: return "Envoyé à Kraken"; case .open: return "Ouvert · état local"; case .partiallyFilled: return "Exécution partielle"; case .reconciliationRequired: return "Vérification en cours"; case .reconciliationBlocked: return "Vérification nécessaire"; case .rejected: return "Ordre refusé"; case .filled: return "Confirmé par Kraken"; case .canceled: return "Annulé"; case .reconciliationFailed: return "Vérification échouée"; case .unknown: return "État inconnu" } }
     static func orderSideText(_ side: String) -> String { side.uppercased().contains("SELL") ? "Vente" : side.uppercased().contains("BUY") ? "Achat" : "Indisponible" }
     static func monitoringText(_ health: RuntimeHealthState) -> String { switch health { case .healthy: return "Fonctionne normalement"; case .degraded: return "À surveiller"; case .unavailable: return "Indisponible"; case .unknown: return "État inconnu" } }
     static func freshnessText(_ freshness: DataFreshness) -> String { SessionFreshnessPresentation.text(for: freshness) }
